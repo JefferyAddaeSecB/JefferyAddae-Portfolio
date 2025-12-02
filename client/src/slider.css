@@ -1,0 +1,65 @@
+/* Carousel Controls */
+.carousel .control-arrow {
+  width: 34px;
+  height: 34px;
+  top: 50% !important;
+  -webkit-transform: translateY(-50%);
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+  border-radius: 50%;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -webkit-justify-content: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  position: absolute;
+  cursor: pointer;
+  background-color: hsl(var(--primary) / 0.8);
+  color: #ffffff;
+  font-size: 20px;
+  z-index: 1;
+  transition: background-color 0.3s;
+}
+
+.carousel .control-arrow:hover {
+  background-color: hsl(var(--primary));
+}
+
+.carousel .control-prev.control-arrow:before {
+  content: "←";
+  border: none;
+}
+
+.carousel .control-next.control-arrow:before {
+  content: "→";
+  border: none;
+}
+
+.carousel .control-prev {
+  left: 25px !important;
+}
+
+.carousel .control-next {
+  right: 25px !important;
+}
+
+/* Carousel Status */
+.carousel .carousel-status {
+  text-shadow: none;
+  color: hsl(var(--muted-foreground));
+  padding: 20px;
+  font-size: 16px;
+  background-color: hsl(var(--background) / 0.7);
+  border-radius: var(--radius);
+}
+
+/* Hide Controls on Small Screens */
+@media screen and (max-width: 767px) {
+  .carousel .control-arrow {
+    display: none;
+  }
+}

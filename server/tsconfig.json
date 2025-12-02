@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "types": ["node"],
+    "paths": {
+      "@/*": ["../client/src/*"],
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["./**/*"],
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "../client/**", 
+    "../dist/**", 
+    "**/*.timestamp-*.mjs",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
+} 

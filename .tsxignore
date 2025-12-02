@@ -1,0 +1,17 @@
+# Ignore client directory - Vite handles its own watching
+client/
+# Ignore build outputs
+dist/
+build/
+.next/
+# Ignore node_modules
+node_modules/
+# Ignore Vite timestamp files
+*.timestamp-*.mjs
+# Ignore common build artifacts
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+

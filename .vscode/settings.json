@@ -1,0 +1,27 @@
+{
+    "cSpell.words": [
+        "architecting",
+        "Ashong",
+        "Dribbble",
+        "Edtech",
+        "Kasoa",
+        "Legon",
+        "MERN",
+        "NAVANTRICS",
+        "Phleodelly",
+        "Photoshop",
+        "Prodigee",
+        "replit",
+        "shadcn",
+        "wireframes",
+        "wouter"
+    ],
+    "css.validate": false,
+    "tailwindCSS.validate": true,
+    "editor.quickSuggestions": {
+        "strings": true
+    },
+    "files.readonlyInclude": {
+        "{**/.c4z/.extsrcs/*.PROTSYM.cbl,**/.c4z/.extsrcs/*.PROTSYM.listing}": true
+    }
+}

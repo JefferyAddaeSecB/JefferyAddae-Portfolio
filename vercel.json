@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm --prefix client ci && npm --prefix client run build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/favicon.ico", "destination": "/assets/profile/2.jpg" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
