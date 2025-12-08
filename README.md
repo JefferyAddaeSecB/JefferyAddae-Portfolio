@@ -47,8 +47,8 @@ Toronto,Ontario Canada
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/FelixAshong/Delly-Portfolio-v3.git
-cd Delly-Portfolio-v3
+git clone (https://github.com/JefferyAddaeSecB/JefferyAddae-Portfolio.git)
+cd JEFF-Portfolio-master
 ```
 
 2. Install dependencies:
@@ -246,10 +246,9 @@ Contributions, issues, and feature requests are welcome! Feel free to check [iss
 ## 👤 Author
 
 **Jeffery Addae**
-- GitHub: [@FelixAshong](https://github.com/FelixAshong)
-- LinkedIn: [Felix Ashong](https://www.linkedin.com/in/felix-ashong/)
-- Twitter: [@phleodelly](https://x.com/phleodelly)
-- Instagram: [@phleodelly](https://www.instagram.com/phleodelly/)
+- GitHub: [@JefferyAddaeSecB](https://github.com/JefferyAddaeSecB)
+- LinkedIn: [Felix Ashong](www.linkedin.com/in/jeffery-addae-297214398)
+
 
 ## 🙏 Acknowledgments
 
