@@ -1,4 +1,4 @@
-# 🚀 Delly Portfolio v3
+# 🚀 Jeffery Portfolio v3
 
 A modern, responsive portfolio website built with React, TypeScript, and Tailwind CSS.
 
@@ -29,16 +29,13 @@ A modern, responsive portfolio website built with React, TypeScript, and Tailwin
 ## 📍 Location
 
 The portfolio website is managed from:
-International Student Hostel (ISH)
-University of Ghana, Legon
-[View on Google Maps](https://www.google.com/maps/place/International+Student+Hostel-+ISH/@5.6400274,-0.1851988,17z/data=!4m6!3m5!1s0xfdf9b7f412fb79b:0x93e65ddaa4a10497!8m2!3d5.6400274!4d-0.1851988!16s%2Fg%2F11gz88yc1)
+Toronto,Ontario Canada
 
 ## 📞 Contact
 
-- **Email**: phleodelly@gmail.com
-- **Phone**: +233 123 456 789
-- **Location**: International Student Hostel (ISH), University of Ghana, Legon
-
+- **Email**: jeffaddai40@gmail.com
+- **Phone**: +1 (437) 499-1703
+- **Location**: Toronto, Onatario. Canada
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -198,7 +195,7 @@ Notes:
 ## �📁 Project Structure
 
 ```
-Delly-Portfolio-v3/
+JEFF-Portfolio-master-v3/
 ├── client/
 │   ├── src/
 │   │   ├── components/
@@ -244,11 +241,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## �� Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check [issues page](https://github.com/FelixAshong/Delly-Portfolio-v3/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check [issues page](https://github.com/JefferyAddaeSecB/JefferyAddae-Portfolio/issues).
 
 ## 👤 Author
 
-**Felix Ashong**
+**Jeffery Addae**
 - GitHub: [@FelixAshong](https://github.com/FelixAshong)
 - LinkedIn: [Felix Ashong](https://www.linkedin.com/in/felix-ashong/)
 - Twitter: [@phleodelly](https://x.com/phleodelly)
