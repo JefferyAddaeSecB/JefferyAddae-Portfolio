@@ -1,4 +1,4 @@
-# 🚀 Jeffery Portfolio v3
+# 🚀 Jeffery Addae Portfolio v3
 
 A modern, responsive portfolio website built with React, TypeScript, and Tailwind CSS.
 
@@ -47,8 +47,8 @@ Toronto,Ontario Canada
 
 1. Clone the repository:
 ```bash
-git clone (https://github.com/JefferyAddaeSecB/JefferyAddae-Portfolio.git)
-cd JEFF-Portfolio-master
+git clone https://github.com/JefferyAddaeSecB/JefferyAddae-Portfolio.git
+cd JEFF-PORTFOLIO-master
 ```
 
 2. Install dependencies:

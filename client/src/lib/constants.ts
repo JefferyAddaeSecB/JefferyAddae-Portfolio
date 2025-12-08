@@ -106,8 +106,8 @@ export const PROJECTS = [
     category: "Full-Stack",
     categoryColor: "blue",
     technologies: ["React", "Next.js", "Supabase", "Cloudinary", "TypeScript"],
-    link: "https://project1.example.com",
-    github: "https://github.com/jeffery-addae/project1"
+    link: "cemar-counseling-main-zip.vercel.app",
+    github: "https://github.com/JefferyAddaeSecB/Cemar-Counseling-Main-Zip"
   },
   {
     title: "AI-Powered SaaS Platform",
@@ -196,8 +196,8 @@ export const PROJECTS = [
     category: "SaaS",
     categoryColor: "blue",
     technologies: ["Next.js", "Supabase", "Stripe", "Cloudinary", "TypeScript"],
-    link: "https://project10.example.com",
-    github: "https://github.com/jeffery-addae/project10"
+    link: "jeffery-addae-portfolio.vercel.app",
+    github: "https://www.linkedin.com/in/jeffery-addae-297214398/"
   }
 ];
 
@@ -219,10 +219,10 @@ export const TESTIMONIALS = [
 ];
 
 export const SOCIAL_LINKS = [
-  { name: "GitHub", icon: "ri-github-fill", url: "https://github.com/jeffery-addae", hoverColor: "red" },
-  { name: "LinkedIn", icon: "ri-linkedin-fill", url: "https://www.linkedin.com/in/jeffery-addae/", hoverColor: "yellow" },
+  { name: "GitHub", icon: "ri-github-fill", url: "https://github.com/jefferyAddaeSecB", hoverColor: "red" },
+  { name: "LinkedIn", icon: "ri-linkedin-fill", url: "https://www.linkedin.com/in/jeffery-addae-297214398/", hoverColor: "yellow" },
   { name: "Twitter", icon: "ri-twitter-fill", url: "https://x.com/jeffery_addae", hoverColor: "green" },
-  { name: "Email", icon: "ri-mail-fill", url: "mailto:jeffery.addae@example.com", hoverColor: "blue" }
+  { name: "Email", icon: "ri-mail-fill", url: "mailto:jeffaddai40@gmail.com", hoverColor: "blue" }
 ];
 
 export const SERVICES = [
