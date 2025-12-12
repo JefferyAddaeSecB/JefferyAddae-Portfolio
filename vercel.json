@@ -3,7 +3,10 @@
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/favicon.ico", "destination": "/assets/profile/2.jpg" },
+    { "source": "/assets/:path*", "destination": "/assets/:path*" },
+    { "source": "/projects/:path*", "destination": "/projects/:path*" },
+    { "source": "/docs/:path*", "destination": "/docs/:path*" },
+    { "source": "/favicon.ico", "destination": "/assets/profile/profile-image.jpg" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
