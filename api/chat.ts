@@ -17,6 +17,13 @@ export default async function handler(req: any, res: any) {
       }>
     };
 
+    const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
+- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Canada
+- Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations
+- Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
+- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
+- Hire/contact: use the Contact page or footer links to reach out.`;
+
     const systemPrompt = `You are an expert AI assistant for Jeffery Addae's professional portfolio. Your role is to provide detailed, insightful analysis and answer questions about his work.
 
 ## JEFFERY'S PROFILE
@@ -54,6 +61,13 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
 
     const apiKey = process.env.OPENROUTER_API_KEY || '';
 
+    if (!apiKey) {
+      return res.status(200).json({ 
+        response: fallbackPortfolioSummary,
+        conversationId: Date.now().toString()
+      });
+    }
+
     const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -78,7 +92,7 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
     }
 
     const data = (await aiResponse.json()) as OpenRouterResponse;
-    const reply = data?.choices?.[0]?.message?.content || 'Sorry, I couldn\'t generate a response right now.';
+    const reply = data?.choices?.[0]?.message?.content || fallbackPortfolioSummary;
 
     return res.status(200).json({ 
       response: reply,
@@ -86,9 +100,9 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
     });
   } catch (error: any) {
     console.error('Chat error:', error);
-    return res.status(500).json({ 
-      message: 'Chat service temporarily unavailable',
-      response: 'I\'m experiencing technical difficulties. Please try again in a moment, or feel free to contact Jeffery directly through the contact page.'
+    return res.status(200).json({ 
+      message: 'Fallback response',
+      response: fallbackPortfolioSummary
     });
   }
 }

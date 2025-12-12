@@ -1,0 +1,14 @@
+{
+  "documents": [
+    {
+      "title": "Portfolio Documentation (Markdown)",
+      "path": "/docs/documentation.md",
+      "description": "Project overview and documentation in Markdown format."
+    },
+    {
+      "title": "Portfolio Documentation (PDF)",
+      "path": "/docs/documentation.pdf",
+      "description": "PDF export of the project documentation."
+    }
+  ]
+}

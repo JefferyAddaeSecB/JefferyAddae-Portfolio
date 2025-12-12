@@ -4,6 +4,27 @@ import { contactMessageSchema } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { sendContactEmail } from "./services/email";
+import type { ChatCompletionRequestMessage } from "openai-edge";
+
+const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
+- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Accra, Ghana
+- Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations (Vercel/Cloudinary/AWS basics)
+- Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
+- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
+- Hire/contact: use the Contact page or the footer links to reach out.`;
+
+const buildMessages = (
+  systemPrompt: string,
+  conversationHistory: any[],
+  message: string
+): ChatCompletionRequestMessage[] => ([
+  { role: "system", content: systemPrompt },
+  ...conversationHistory.map((msg: any) => ({
+    role: msg.role,
+    content: msg.content
+  })),
+  { role: "user", content: message }
+]);
 
 export async function registerRoutes(app: Express): Promise<void> {
   // Health check endpoint
@@ -21,7 +42,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         message: "This is a test email from your portfolio contact form."
       };
 
-      await sendContactEmail(testData);
+      const emailResult = await sendContactEmail(testData);
+      if (!emailResult.success) {
+        return res.status(500).json({ 
+          message: "Failed to send test email",
+          error: emailResult.emailError || "Email configuration is missing or invalid"
+        });
+      }
+
       return res.status(200).json({ message: "Test email sent successfully" });
     } catch (error) {
       console.error("Error sending test email:", error);
@@ -42,7 +70,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       const savedMessage = await storage.createContactMessage(validatedData);
       
       // Send email notification
-      await sendContactEmail(validatedData);
+      const emailResult = await sendContactEmail(validatedData);
+      if (!emailResult.success) {
+        return res.status(500).json({
+          message: "Failed to send email",
+          error: emailResult.emailError || "Email configuration is missing or invalid"
+        });
+      }
       
       // Return success response
       return res.status(201).json({ 
@@ -127,18 +161,16 @@ export async function registerRoutes(app: Express): Promise<void> {
 
 Respond naturally and helpfully to questions about Jeffery's skills, projects, experience, availability, or technical expertise.`;
 
-      // Build messages array with conversation history
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...conversationHistory.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        { role: 'user', content: message }
-      ];
-
-      // Use OpenRouter with free AI model (no API key required for free models)
+      const messages = buildMessages(systemPrompt, conversationHistory, message);
       const apiKey = process.env.OPENROUTER_API_KEY || '';
+
+      // If there's no API key, return a high-quality fallback so the assistant still feels responsive
+      if (!apiKey) {
+        return res.status(200).json({
+          response: fallbackPortfolioSummary,
+          conversationId: Date.now().toString()
+        });
+      }
 
       const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -164,7 +196,7 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
       }
 
       const data = await aiResponse.json();
-      const reply = data.choices?.[0]?.message?.content || 'Sorry, I couldn\'t generate a response right now.';
+      const reply = data.choices?.[0]?.message?.content || fallbackPortfolioSummary;
 
       return res.status(200).json({ 
         response: reply,
@@ -172,9 +204,10 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
       });
     } catch (error) {
       console.error("Error in chat endpoint:", error);
-      return res.status(500).json({ 
-        message: "Chat service temporarily unavailable",
-        response: "I'm experiencing technical difficulties. Please try again in a moment, or feel free to contact Jeffery directly through the contact page."
+      // Graceful fallback so users still get value if the AI call fails
+      return res.status(200).json({ 
+        message: "Fallback response",
+        response: fallbackPortfolioSummary
       });
     }
   });

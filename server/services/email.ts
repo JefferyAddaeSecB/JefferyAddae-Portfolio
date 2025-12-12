@@ -155,6 +155,20 @@ const validateEmail = (email: string): boolean => {
   return Boolean(email && email.includes("@") && email.includes("."))
 }
 
+const ensureEmailConfig = () => {
+  const from = process.env.FROM_EMAIL || process.env.EMAIL_USER;
+  const admin = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+
+  if (!from || !validateEmail(from)) {
+    throw new Error("Email sender not configured. Set EMAIL_USER (and EMAIL_PASSWORD) to a valid email address.");
+  }
+  if (!admin || !validateEmail(admin)) {
+    throw new Error("Admin email not configured. Set ADMIN_EMAIL or EMAIL_USER to a valid email address.");
+  }
+
+  return { from, admin };
+};
+
 const emailTemplate = (data: { name: string; email: string; subject: string; message: string }, isReply = false) => {
   const { name, email, subject, message } = data
   const logoUrl = "https://i.ibb.co/xtLj3nB3/photo-2025-11-04-23-34-45.jpg"
@@ -441,8 +455,8 @@ const emailTemplate = (data: { name: string; email: string; subject: string; mes
             </p>
             <div class="social-links">
               <a href="https://www.youtube.com/@dellyknowstech">YouTube</a>
-              <a href="https://github.com">GitHub</a>
-              <a href="https://linkedin.com">LinkedIn</a>
+              <a href="https://github.com/JefferyAddaeSecB">GitHub</a>
+              <a href="https://www.linkedin.com/in/jeffery-addae-297214398/">LinkedIn</a>
             </div>
           </div>
         </div>
@@ -735,8 +749,8 @@ const replyTemplate = (data: { name: string; email: string }) => {
             </p>
             <div class="social-links">
               <a href="https://www.youtube.com/@dellyknowstech">YouTube</a>
-              <a href="https://github.com/FelixAshong">GitHub</a>
-              <a href="https://linkedin.com">LinkedIn</a>
+              <a href="https://github.com/JefferyAddaeSecB">GitHub</a>
+              <a href="https://www.linkedin.com/in/jeffery-addae-297214398/">LinkedIn</a>
             </div>
           </div>
         </div>
@@ -747,14 +761,9 @@ const replyTemplate = (data: { name: string; email: string }) => {
 
 export const sendTestEmail = async () => {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL || process.env.EMAIL_USER
+    const { admin } = ensureEmailConfig();
 
-    if (!adminEmail) {
-      console.warn("[Email Debug] sendTestEmail skipped because admin email not set")
-      return { success: false, emailSkipped: true } as const
-    }
-
-    console.log("Sending test email to:", adminEmail)
+    console.log("Sending test email to:", admin)
 
     // Nodemailer (SMTP) only
     const transporterLocal = getTransporter()
@@ -766,13 +775,13 @@ export const sendTestEmail = async () => {
     const info = await sendWithFallback(transporterLocal, {
       from: {
         name: "Portfolio Contact Form",
-        address: adminEmail,
+        address: admin,
       },
-      to: adminEmail,
+      to: admin,
       subject: "Test Email from Portfolio",
       html: emailTemplate({
         name: "Test User",
-        email: adminEmail,
+        email: admin,
         subject: "Test Email",
         message:
           "This is a test email from your portfolio contact form. If you're receiving this, the email service is working correctly.",
@@ -791,21 +800,19 @@ export const sendTestEmail = async () => {
 
 export const sendContactEmail = async (data: { name: string; email: string; subject: string; message: string }) => {
   try {
-    const fromAddress = process.env.FROM_EMAIL || process.env.EMAIL_USER
-    const adminRecipient = process.env.ADMIN_EMAIL || process.env.EMAIL_USER
+    const { from, admin } = ensureEmailConfig();
 
-    // Nodemailer-only: send via SMTP transport (with fallback)
     // Nodemailer-only: send via SMTP transport (with fallback)
     const transporterLocal = getTransporter()
 
     if (!transporterLocal) {
       console.warn("[Email Debug] sendContactEmail: transporter not available, skipping email sends")
-      return { success: true, emailSkipped: true } as const
+      return { success: false, emailError: "Email transport not configured. Set EMAIL_USER and EMAIL_PASSWORD." } as const
     }
 
     const adminMailOptions = {
-      from: fromAddress,
-      to: adminRecipient,
+      from,
+      to: admin,
       subject: data.subject,
       html: emailTemplate(data),
     }
@@ -814,7 +821,7 @@ export const sendContactEmail = async (data: { name: string; email: string; subj
     console.log('[Email Debug] admin sendMail info:', { messageId: (adminInfo as any).messageId, accepted: (adminInfo as any).accepted, rejected: (adminInfo as any).rejected })
 
     const userMailOptions = {
-      from: fromAddress,
+      from,
       to: data.email,
       subject: "Thank you for contacting DELLYKNOWSTECH!",
       html: replyTemplate({ name: data.name, email: data.email }),

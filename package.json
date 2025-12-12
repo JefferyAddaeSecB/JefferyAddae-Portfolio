@@ -4,7 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development PORT=3000 tsx watch --exclude client/** --exclude dist/** --exclude **/*.timestamp-*.mjs --exclude node_modules/** server/index.ts",
+    "dev": "npm run dev:server & cd client && npm run dev -- --host",
+    "dev:server": "cross-env NODE_ENV=development PORT=3000 tsx watch --exclude client/** --exclude dist/** --exclude **/*.timestamp-*.mjs --exclude node_modules/** server/index.ts",
+    "dev:client": "cd client && npm run dev -- --host",
     "build": "cd client && vite build && cd .. && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && cp -r client/dist dist/public && [ -f .env ] && cp .env dist/ || true",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",

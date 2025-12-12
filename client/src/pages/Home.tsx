@@ -95,8 +95,8 @@ const Home = () => {
                 <div className="absolute inset-0 bg-primary/20 rounded-3xl blur-3xl"></div>
                 <div className="relative w-72 h-72 sm:w-96 sm:h-96">
                   <GlowingProfileImage 
-                    imageUrl="https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=Jeffery&backgroundColor=b6e3f4&eyebrows=default&eyes=happy&mouth=smile&skinColor=light&hair=short04&hairColor=4a312c&clothingColor=262e33&size=400"
-                    altText="Jeffery Addae 3D Avatar"
+                    imageUrl="/assets/profile/profile-image.jpg"
+                    altText="Jeffery Addae"
                     glowColor="#3b82f6"
                     glowIntensity={0.8}
                     className="w-full h-full rounded-3xl"

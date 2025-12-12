@@ -15,8 +15,34 @@ import CursorPatternBackground from "@/components/CursorPatternBackground";
 import { AIPortfolioAssistant } from "@/components/AIPortfolioAssistant";
 import Loading from "@/components/Loading";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Suspense } from "react";
+import { Suspense, useEffect, useLayoutEffect } from "react";
 import About from './pages/About';
+
+// Reset scroll on every route change so navigation (incl. footer links) opens at the top
+const RouteScrollReset = () => {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    // Belt-and-suspenders: reset scroll immediately, next frame, and after paint
+    const reset = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    reset();
+    requestAnimationFrame(reset);
+    setTimeout(reset, 0);
+  }, [location]);
+
+  return null;
+};
 
 function Router() {
   const [location] = useLocation();
@@ -25,6 +51,7 @@ function Router() {
     <AnimatePresence mode="wait">
       <ErrorBoundary>
         <Suspense fallback={<Loading />}>
+          <RouteScrollReset />
           <Switch location={location}>
             <Route path="/" component={Home} />
             <Route path="/about" component={About} />
