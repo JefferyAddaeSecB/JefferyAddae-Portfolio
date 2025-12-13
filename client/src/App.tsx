@@ -1,22 +1,26 @@
 import { Switch, Route, useLocation } from "wouter";
 import { AnimatePresence } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
-import Skills from "@/pages/Skills";
-import Projects from "@/pages/Projects";
-import Contact from "@/pages/Contact";
-import CV from "@/pages/CV";
-import Experience from "@/pages/Experience";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
-import CursorPatternBackground from "@/components/CursorPatternBackground";
-import { AIPortfolioAssistant } from "@/components/AIPortfolioAssistant";
 import Loading from "@/components/Loading";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Suspense, useEffect, useLayoutEffect } from "react";
-import About from './pages/About';
+import { Suspense, useEffect, useLayoutEffect, lazy } from "react";
+
+// Lazily load pages/components to shrink the initial bundle
+const Home = lazy(() => import("@/pages/Home"));
+const About = lazy(() => import("@/pages/About"));
+const Skills = lazy(() => import("@/pages/Skills"));
+const Projects = lazy(() => import("@/pages/Projects"));
+const Contact = lazy(() => import("@/pages/Contact"));
+const CV = lazy(() => import("@/pages/CV"));
+const Experience = lazy(() => import("@/pages/Experience"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const CursorPatternBackground = lazy(() => import("@/components/CursorPatternBackground"));
+const AIPortfolioAssistant = lazy(() =>
+  import("@/components/AIPortfolioAssistant").then((mod) => ({ default: mod.AIPortfolioAssistant }))
+);
 
 // Reset scroll on every route change so navigation (incl. footer links) opens at the top
 const RouteScrollReset = () => {
@@ -78,14 +82,18 @@ function App() {
       </main>
       <Footer />
       <ScrollToTop />
-      <AIPortfolioAssistant />
+      <Suspense fallback={null}>
+        <AIPortfolioAssistant />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CursorPatternBackground 
+          color="#3b82f6"
+          particleCount={70}
+          lineLength={100}
+          speed={0.3}
+        />
+      </Suspense>
       <Toaster />
-      <CursorPatternBackground 
-        color="#3b82f6"
-        particleCount={70}
-        lineLength={100}
-        speed={0.3}
-      />
     </div>
   );
 }
