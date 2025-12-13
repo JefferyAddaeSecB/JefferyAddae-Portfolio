@@ -8,6 +8,9 @@ export default {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Force a single React copy to avoid invalid hook calls when dependencies
+    // resolve React from different locations in nested node_modules.
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     outDir: 'dist',

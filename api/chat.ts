@@ -1,10 +1,3 @@
-const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
-- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Canada
-- Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations
-- Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
-- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
-- Hire/contact: use the Contact page or footer links to reach out.`;
-
 export default async function handler(req: any, res: any) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -23,6 +16,13 @@ export default async function handler(req: any, res: any) {
         message?: { content?: string }
       }>
     };
+
+    const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
+- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Canada
+- Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations
+- Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
+- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
+- Hire/contact: use the Contact page or footer links to reach out.`;
 
     const systemPrompt = `You are an expert AI assistant for Jeffery Addae's professional portfolio. Your role is to provide detailed, insightful analysis and answer questions about his work.
 
