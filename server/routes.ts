@@ -162,26 +162,41 @@ export async function registerRoutes(app: Express): Promise<void> {
 Respond naturally and helpfully to questions about Jeffery's skills, projects, experience, availability, or technical expertise.`;
 
       const messages = buildMessages(systemPrompt, conversationHistory, message);
-      const apiKey = process.env.OPENROUTER_API_KEY || '';
+      const vercelGatewayUrl = process.env.VERCEL_AI_GATEWAY_URL;
+      const vercelGatewayKey = process.env.VERCEL_AI_GATEWAY_KEY;
+      const openRouterKey = process.env.OPENROUTER_API_KEY || '';
+      const model = process.env.AI_MODEL || (vercelGatewayUrl ? 'gpt-4o-mini' : 'meta-llama/llama-3.1-8b-instruct:free');
 
-      // If there's no API key, return a high-quality fallback so the assistant still feels responsive
-      if (!apiKey) {
+      // If there's no key configured, return a graceful fallback so the assistant still feels responsive
+      if (!vercelGatewayKey && !openRouterKey) {
         return res.status(200).json({
           response: fallbackPortfolioSummary,
           conversationId: Date.now().toString()
         });
       }
 
-      const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const useGateway = Boolean(vercelGatewayUrl && vercelGatewayKey);
+      const endpoint = useGateway
+        ? vercelGatewayUrl!
+        : 'https://openrouter.ai/api/v1/chat/completions';
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (useGateway) {
+        headers['Authorization'] = `Bearer ${vercelGatewayKey}`;
+      } else {
+        headers['Authorization'] = `Bearer ${openRouterKey}`;
+        headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost:3000';
+        headers['X-Title'] = 'Jeffery Addae Portfolio';
+      }
+
+      const aiResponse = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-          'X-Title': 'Jeffery Addae Portfolio'
-        },
+        headers,
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.3-70b-instruct:free',
+          model,
           messages,
           max_tokens: 400,
           temperature: 0.8,

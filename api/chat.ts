@@ -59,25 +59,43 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
       { role: 'user', content: message }
     ];
 
-    const apiKey = process.env.OPENROUTER_API_KEY || '';
+    const vercelGatewayUrl = process.env.VERCEL_AI_GATEWAY_URL;
+    const vercelGatewayKey = process.env.VERCEL_AI_GATEWAY_KEY;
+    const openRouterKey = process.env.OPENROUTER_API_KEY || '';
+    const model =
+      process.env.AI_MODEL ||
+      (vercelGatewayUrl ? 'gpt-4o-mini' : 'meta-llama/llama-3.1-8b-instruct:free');
 
-    if (!apiKey) {
+    if (!vercelGatewayKey && !openRouterKey) {
       return res.status(200).json({ 
         response: fallbackPortfolioSummary,
         conversationId: Date.now().toString()
       });
     }
 
-    const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    // Prefer Vercel AI Gateway if configured; otherwise fall back to OpenRouter free tier.
+    const isGateway = Boolean(vercelGatewayUrl && vercelGatewayKey);
+    const endpoint = isGateway
+      ? vercelGatewayUrl!
+      : 'https://openrouter.ai/api/v1/chat/completions';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (isGateway) {
+      headers['Authorization'] = `Bearer ${vercelGatewayKey}`;
+    } else {
+      headers['Authorization'] = `Bearer ${openRouterKey}`;
+      headers['HTTP-Referer'] = process.env.APP_URL || 'https://jeffery-portfolio.vercel.app';
+      headers['X-Title'] = 'Jeffery Addae Portfolio';
+    }
+
+    const aiResponse = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': process.env.APP_URL || 'https://jeffery-portfolio.vercel.app',
-        'X-Title': 'Jeffery Addae Portfolio'
-      },
+      headers,
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.3-70b-instruct:free',
+        model,
         messages,
         max_tokens: 400,
         temperature: 0.8,
