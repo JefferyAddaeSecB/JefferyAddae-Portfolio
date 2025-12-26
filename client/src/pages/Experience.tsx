@@ -13,7 +13,7 @@ interface ExperienceItem {
 // Placeholder experience data - Jeffery will provide actual details
 const EXPERIENCE_DATA: ExperienceItem[] = [
   {
-    title: "Senior Full-Stack Developer",
+    title: "Senior Full-Stack Developer & AI Automation Specialist",
     organization: "Tech Innovations Inc.",
     location: "Toronto, Canada",
     period: "2024 - Present",
@@ -26,7 +26,7 @@ const EXPERIENCE_DATA: ExperienceItem[] = [
     ]
   },
   {
-    title: "Full-Stack Developer",
+    title: "Full-Stack Developer & AI Automation Specialist",
     organization: "Digital Solutions Agency",
     location: "Remote, Canada",
     period: "2023 - 2024",

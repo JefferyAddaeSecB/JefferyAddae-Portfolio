@@ -7,10 +7,10 @@ import { sendContactEmail } from "./services/email";
 import type { ChatCompletionRequestMessage } from "openai-edge";
 
 const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
-- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Accra, Ghana
+- Role: Full-Stack Developer & AI Automation Specialist (2+ years), based in Accra, Ghana
 - Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations (Vercel/Cloudinary/AWS basics)
 - Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
-- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
+- Services: full-stack builds, AI automation systems, API design/integration, cloud/database setup, UI/UX optimization, MVP delivery
 - Hire/contact: use the Contact page or the footer links to reach out.`;
 
 const buildMessages = (
@@ -113,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
 ## JEFFERY'S PROFILE
 **Name:** Jeffery Addae  
-**Title:** Full-Stack Developer & Tech Problem Solver  
+**Title:** Full-Stack Developer & AI Automation Specialist  
 **Location:** Accra, Ghana  
 **Experience:** 2+ years professional experience
 
@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 - Cloud & Database Integration (Supabase, Firebase)
 - API Design & Integration (RESTful, GraphQL)
 - UI/UX Optimization & Design Systems
-- Automation & AI-Driven Systems
+- Automation & AI-Driven Systems (business workflow automation)
 - MVP Building & Product Management
 
 ## INTERACTION GUIDELINES

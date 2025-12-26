@@ -1,8 +1,8 @@
 const fallbackPortfolioSummary = `I'm Jeffery's portfolio assistant. Here's a quick overview so you still get a helpful answer even if the live AI is unavailable:
-- Role: Full-Stack Developer & Tech Problem Solver (2+ years), based in Canada
+- Role: Full-Stack Developer & AI Automation Specialist (2+ years), based in Canada
 - Strengths: React, Next.js, TypeScript, Tailwind, Node.js/Express, Supabase, Firebase, MongoDB, Git/GitHub, cloud integrations
 - Recent work: data-driven web apps, AI-powered SaaS, e-commerce MVPs, real-time dashboards
-- Services: full-stack builds, API design/integration, cloud/database setup, UI/UX optimization, automation/AI systems, MVP delivery
+- Services: full-stack builds, AI automation systems, API design/integration, cloud/database setup, UI/UX optimization, MVP delivery
 - Hire/contact: use the Contact page or footer links to reach out.`;
 
 export default async function handler(req, res) {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
 ## JEFFERY'S PROFILE
 **Name:** Jeffery Addae  
-**Title:** Full-Stack Developer  
+**Title:** Full-Stack Developer & AI Automation Specialist  
 **Location:** Canada  
 **Experience:** 2+ years professional experience
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 - Cloud & Database Integration (Supabase, Firebase)
 - API Design & Integration (RESTful, GraphQL)
 - UI/UX Optimization & Design Systems
-- Automation & AI-Driven Systems
+- Automation & AI-Driven Systems (business workflow automation)
 - MVP Building & Product Management
 
 Respond naturally and helpfully to questions about Jeffery's skills, projects, experience, availability, or technical expertise.`;

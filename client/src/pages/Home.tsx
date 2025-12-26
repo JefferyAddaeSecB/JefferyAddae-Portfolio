@@ -30,20 +30,23 @@ const Home = () => {
                 transition={{ duration: 0.5 }}
                 className="inline-block mb-4 px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-semibold"
               >
-                👋 Welcome to my portfolio
+                👋 Welcome — I help businesses fix time leaks.
               </motion.div>
               
               <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-                <span className="text-foreground">I'm </span>
+                <span className="text-foreground">I’m </span>
                 <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">Jeffery Addae</span>
               </h1>
               
               <h2 className="text-2xl md:text-3xl font-semibold text-muted-foreground mb-6">
-                Full-Stack Developer
+                AI Automation Specialist & Full-Stack Developer
               </h2>
               
+              <p className="text-lg text-muted-foreground mb-6 max-w-xl mx-auto lg:mx-0">
+                Most businesses lose money to manual work, slow processes, and human bottlenecks. I help solve that by implementing AI automation systems that reduce manpower strain, save time, and increase return on investment.
+              </p>
               <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0">
-                I craft modern web applications with <span className="text-primary font-semibold">React</span>, <span className="text-primary font-semibold">Next.js</span>, and cloud technologies. Transforming ideas into scalable, high-performance digital solutions.
+                I build the systems behind the scenes, from AI-powered workflows and chatbots to scalable web platforms — so your business runs faster, leaner, and smarter.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -122,7 +125,7 @@ const Home = () => {
               What I <span className="text-primary">Do</span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Specializing in full-stack development with modern technologies
+              Specializing in full-stack development and AI automation systems that streamline business workflows
             </p>
           </motion.div>
           
@@ -141,7 +144,7 @@ const Home = () => {
               {
                 icon: <FiCpu className="w-10 h-10 text-primary" />,
                 title: "AI & Automation",
-                desc: "Building intelligent systems with AI-driven workflows"
+                desc: "Building AI automation systems that help businesses save time and reduce manual work"
               }
             ].map((service, index) => (
               <motion.div
@@ -318,6 +321,48 @@ const Home = () => {
               className="w-12 h-12 object-contain mb-2"
             />
             <span className="text-foreground font-medium text-sm">Supabase</span>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            whileHover={{ scale: 1.05 }}
+            className="bg-card rounded-xl p-6 border border-border hover:border-primary/50 transition-all duration-300 flex flex-col items-center justify-center h-32 hover:shadow-lg"
+          >
+            <img 
+              src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/openai.svg"
+              alt="OpenAI"
+              className="w-12 h-12 object-contain mb-2 dark:invert"
+            />
+            <span className="text-foreground font-medium text-sm">OpenAI</span>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            whileHover={{ scale: 1.05 }}
+            className="bg-card rounded-xl p-6 border border-border hover:border-primary/50 transition-all duration-300 flex flex-col items-center justify-center h-32 hover:shadow-lg"
+          >
+            <img 
+              src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/langchain.svg"
+              alt="LangChain"
+              className="w-12 h-12 object-contain mb-2 dark:invert"
+            />
+            <span className="text-foreground font-medium text-sm">LangChain</span>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            whileHover={{ scale: 1.05 }}
+            className="bg-card rounded-xl p-6 border border-border hover:border-primary/50 transition-all duration-300 flex flex-col items-center justify-center h-32 hover:shadow-lg"
+          >
+            <img 
+              src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/n8n.svg"
+              alt="n8n"
+              className="w-12 h-12 object-contain mb-2 dark:invert"
+            />
+            <span className="text-foreground font-medium text-sm">n8n</span>
           </motion.div>
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}

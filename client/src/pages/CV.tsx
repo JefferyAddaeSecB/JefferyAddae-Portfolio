@@ -171,7 +171,8 @@ const CV = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <h2 className="text-2xl font-bold text-foreground mb-4">Front-End Developer | Full Stack Web Developer
+              <h2 className="text-2xl font-bold text-foreground mb-4">
+                Front-End Developer | Full Stack Web Developer | AI Automation Specialist
               </h2>
               
               <div className="space-y-6">

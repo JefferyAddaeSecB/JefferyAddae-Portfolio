@@ -19,7 +19,7 @@ const Footer = () => {
               <span className="font-heading font-bold text-2xl text-foreground dark:text-white hidden md:inline ml-2">Jeffery Addae</span>
             </div>
             <p className="text-muted-foreground">
-              Building modern web applications with React, Next.js, and cloud technologies.
+              Building modern web applications and AI automation systems with React, Next.js, and cloud technologies.
             </p>
             <div className="flex space-x-4 pt-2">
               <a href="https://github.com/JefferyAddaeSecB" className="text-muted-foreground hover:text-primary transition-colors">
@@ -61,7 +61,7 @@ const Footer = () => {
               <span className="text-muted-foreground hover:text-primary transition-colors">Full-Stack Development</span>
               <span className="text-muted-foreground hover:text-primary transition-colors">Cloud Integration</span>
               <span className="text-muted-foreground hover:text-primary transition-colors">API Design</span>
-              <span className="text-muted-foreground hover:text-primary transition-colors">AI-Driven Systems</span>
+              <span className="text-muted-foreground hover:text-primary transition-colors">AI Automation Systems</span>
             </nav>
           </div>
           

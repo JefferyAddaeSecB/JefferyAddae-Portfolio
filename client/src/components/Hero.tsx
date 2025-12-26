@@ -21,7 +21,7 @@ const Hero = () => {
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white leading-tight mb-6">
               I AM A FULL-STACK<br />
-              WEB & SOFTWARE DEVELOPER
+              WEB DEVELOPER & AI AUTOMATION SPECIALIST
             </h1>
             
             <div className="flex items-center space-x-3 mb-8">

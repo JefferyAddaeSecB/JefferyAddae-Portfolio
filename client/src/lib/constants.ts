@@ -75,6 +75,21 @@ export const TOOLS = [
     icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/firebase/firebase-plain.svg"
   },
   { 
+    name: "OpenAI", 
+    percentage: 85,
+    icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/openai.svg"
+  },
+  { 
+    name: "LangChain", 
+    percentage: 82,
+    icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/langchain.svg"
+  },
+  { 
+    name: "n8n", 
+    percentage: 80,
+    icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/n8n.svg"
+  },
+  { 
     name: "Git & GitHub", 
     percentage: 95,
     icon: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg"
@@ -89,8 +104,8 @@ export const TOOLS = [
 // Bio and Philosophy
 export const BIO = {
   name: "Jeffery Addae",
-  tagline: "Passionate Full-Stack Developer",
-  intro: "I design, build, and deploy modern web applications that balance functionality, performance, and user experience. Whether it's developing data-driven platforms, optimizing cloud integrations, or crafting responsive UI, I bring ideas to life through clean, scalable code.",
+  tagline: "Full-Stack Developer & AI Automation Specialist",
+  intro: "I design, build, and deploy modern web applications and AI automation systems that help businesses save time. Whether it's developing data-driven platforms, optimizing cloud integrations, or crafting responsive UI, I bring ideas to life through clean, scalable code.",
   philosophy: [
     "Build scalable, maintainable systems with clean architecture",
     "Balance functionality, performance, and exceptional user experience",
@@ -271,12 +286,12 @@ export const SERVICES = [
   },
   {
     title: "Automation & AI-Driven Systems",
-    description: "Building intelligent systems powered by automation and AI integrations.",
+    description: "Building AI automation systems that help businesses save time and streamline operations.",
     features: [
       "Workflow Automation",
       "AI Model Integration (OpenAI, etc.)",
-      "Chatbots & Virtual Assistants",
-      "Data Processing & Analytics"
+      "AI Assistants & Agents",
+      "Process Optimization & Analytics"
     ]
   },
   {

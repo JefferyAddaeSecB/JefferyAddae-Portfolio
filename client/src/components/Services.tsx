@@ -22,10 +22,12 @@ const Services: React.FC = () => {
           viewport={{ once: true, amount: 0.1 }}
           variants={fadeIn()}
         >
-          <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">MODERN WEB & SOFTWARE DEVELOPMENT SERVICES</h2>
+          <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
+            WEB DEVELOPMENT & AI AUTOMATION SERVICES
+          </h2>
           <div className="w-20 h-1 ghana-gradient mx-auto mb-6"></div>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            Comprehensive web and software development solutions tailored to your specific needs, from concept to deployment and beyond.
+            Full-stack builds and AI automation systems tailored to your business, from concept to deployment and ongoing optimization.
           </p>
         </motion.div>
         

@@ -1,7 +1,7 @@
 # PhleoDelly Portfolio - Technical Documentation
 
 ## Project Overview
-A modern, responsive portfolio website showcasing skills as a Front-End Developer | Full Stack Web Developer. Built with React, TypeScript, and modern web technologies.
+A modern, responsive portfolio website showcasing skills as a Front-End Developer | Full Stack Web Developer | AI Automation Specialist. Built with React, TypeScript, and modern web technologies.
 
 ## Tech Stack
 
