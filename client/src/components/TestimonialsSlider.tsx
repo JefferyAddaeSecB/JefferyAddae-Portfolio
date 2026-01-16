@@ -8,14 +8,19 @@ const TestimonialsSlider = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % TESTIMONIALS.length);
-    }, 5000); // Change slide every 5 seconds
+    }, 8000); // Change slide every 8 seconds
 
     return () => clearInterval(timer);
   }, []);
 
   return (
     <div className="relative w-full max-w-4xl mx-auto py-12">
-      <h2 className="text-3xl md:text-4xl font-bold text-primary mb-12 text-center">CLIENT TESTIMONIALS</h2>
+      <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4 text-center">
+        Early Results & Founder Feedback
+      </h2>
+      <p className="text-xs text-muted-foreground text-center mb-8">
+        Typical workflows automated: Lead intake • CRM sync • Follow-ups • Reporting • Internal ops • AI assistants
+      </p>
       
       <div className="relative h-[300px] overflow-hidden">
         <AnimatePresence mode="wait">
@@ -29,11 +34,13 @@ const TestimonialsSlider = () => {
           >
             <div className="flex flex-col items-center justify-center text-center px-4">
               <div className="w-20 h-20 rounded-full overflow-hidden mb-4">
-                <img 
-                  src={TESTIMONIALS[currentIndex].avatar} 
-                  alt={TESTIMONIALS[currentIndex].name}
-                  className="w-full h-full object-cover"
-                />
+              <img
+                src={TESTIMONIALS[currentIndex].avatar}
+                alt={TESTIMONIALS[currentIndex].name}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">
                 {TESTIMONIALS[currentIndex].name}
@@ -59,6 +66,7 @@ const TestimonialsSlider = () => {
           />
         ))}
       </div>
+
     </div>
   );
 };

@@ -20,7 +20,7 @@ const CV = () => {
       // Create a link element
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = 'Felix CV.pdf';
+      link.download = 'Jeffery_Addae_CV.pdf';
       
       // Append to body and click
       document.body.appendChild(link);
@@ -143,13 +143,24 @@ const CV = () => {
             className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary mb-4 md:mb-0"
           >
             <img 
-              src="/assets/profile/3.jpg" 
-              alt="Felix Ashong" 
+              src="/assets/profile/profile-image.jpg" 
+              alt="Jeffery Addae" 
               className="w-full h-full object-cover"
             />
           </motion.div>
           
-          <h1 className="text-4xl md:text-5xl font-bold text-primary">FELIX ASHONG</h1>
+          <div className="flex flex-col">
+            <h1 className="text-4xl md:text-5xl font-bold text-primary">JEFFERY ADDAE</h1>
+            <p className="text-muted-foreground text-base md:text-lg mt-2">
+              AI Automation Engineer | Full-Stack Developer
+            </p>
+            <p className="text-muted-foreground text-sm mt-2">
+              Toronto, Ontario, Canada
+            </p>
+            <p className="text-muted-foreground text-sm mt-2">
+              📧 jeffaddai40@gmail.com | 🌐 Portfolio | 💼 LinkedIn | 🧠 GitHub
+            </p>
+          </div>
         </div>
         
         <div className="flex flex-col items-end space-y-1">
@@ -171,45 +182,58 @@ const CV = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <h2 className="text-2xl font-bold text-foreground mb-4">
-                Front-End Developer | Full Stack Web Developer | AI Automation Specialist
-              </h2>
-              
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xl font-semibold text-primary mb-2">PROFESSIONAL SUMMARY</h3>
                   <p className="text-foreground/80">
-                  A results-oriented individual and a motivated student eager to apply classroom knowledge to real-world experiences, with a strong willingness to learn and contribute. Effective communicator with a collaborative mindset, ready to bring fresh perspectives and a strong work ethic to any team.                  </p>
+                    AI Automation Engineer and Full-Stack Developer specializing in workflow automation, AI systems, and scalable web applications.
+                    Experienced in building production-ready n8n automations, backend services, and AI-powered tools that reduce manual work,
+                    improve operational efficiency, and support business growth.
+                  </p>
                 </div>
-                
+
                 <div>
-                  <h3 className="text-xl font-semibold text-primary mb-2">WORK EXPERIENCE</h3>
+                  <h3 className="text-xl font-semibold text-primary mb-2">PROFESSIONAL EXPERIENCE</h3>
                   
                   <div className="space-y-6">
                     <div>
                       <div className="flex justify-between mb-1">
-                        <h4 className="text-lg font-semibold text-foreground">Front-End Intern</h4>
-                        <span className="text-primary">08/2023 - 10/2023</span>
+                        <h4 className="text-lg font-semibold text-foreground">AI Automation Engineer & Full-Stack Developer</h4>
+                        <span className="text-primary">2023 – Present</span>
                       </div>
-                      <p className="text-foreground/80 mb-2">NAVANTRICS LTD | Kasoa</p>
+                      <p className="text-foreground/80 mb-2">Freelance / Contract — Remote</p>
                       <ul className="list-disc list-inside space-y-2 text-foreground/80">
-                        <li>Developed 4 responsive webpages using React and CSS, improving user engagement by 10% based on client feedback.</li>
-                        <li>Designed interactive UIs for 2 web apps using Figma, creating wireframes and prototypes that increased client satisfaction by 15%.</li>
-                        <li>Gathered client requirements and feedback to refine UI designs, ensuring alignment with project goals.</li>
-                        <li>Built responsive webpages with React and Node.js, viewable on my Github.</li>
+                        <li>Designed and deployed AI-powered automation workflows using n8n for lead intake, CRM sync, internal operations, and reporting.</li>
+                        <li>Built multi-step workflows with triggers, conditional logic, retries, and error handling.</li>
+                        <li>Integrated third-party systems (forms, email, databases, dashboards) into unified automation pipelines.</li>
+                        <li>Implemented AI assistants for support triage, email follow-ups, and internal knowledge retrieval.</li>
+                        <li>Delivered reusable automation frameworks to improve scalability and reduce operational overhead.</li>
                       </ul>
                     </div>
                     
                     <div>
                       <div className="flex justify-between mb-1">
-                        <h4 className="text-lg font-semibold text-foreground">Networking Intern</h4>
-                        <span className="text-primary">01/2024 - 03/2024</span>
+                        <h4 className="text-lg font-semibold text-foreground">Full-Stack Developer</h4>
+                        <span className="text-primary">2022 – 2023</span>
                       </div>
-                      <p className="text-foreground/80 mb-2">University Of Ghana Computing Systems | Legon</p>
+                      <p className="text-foreground/80 mb-2">Digital Solutions Projects — Remote</p>
                       <ul className="list-disc list-inside space-y-2 text-foreground/80">
-                        <li>Analyzed system needs with IT team, implementing solutions to enhance network reliability for students on campus.</li>
-                        <li>Diagnosed and resolved over 15 network faults, restoring connectivity within couple of hours per incident.</li>
-                        <li>Collaborated with various campus department to deploy network upgrades and fixes.</li>
+                        <li>Developed full-stack web applications using React, TypeScript, Node.js, and Supabase.</li>
+                        <li>Designed RESTful APIs and integrated cloud services for authentication, storage, and data sync.</li>
+                        <li>Improved application performance through modular architecture and optimization.</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <h4 className="text-lg font-semibold text-foreground">Junior Web Developer</h4>
+                        <span className="text-primary">2021 – 2022</span>
+                      </div>
+                      <p className="text-foreground/80 mb-2">Project-Based Work — Remote</p>
+                      <ul className="list-disc list-inside space-y-2 text-foreground/80">
+                        <li>Built responsive UI components using React and Tailwind CSS.</li>
+                        <li>Assisted with API integrations and backend feature development.</li>
+                        <li>Participated in Git-based workflows and Agile development practices.</li>
                       </ul>
                     </div>
                   </div>
@@ -219,23 +243,28 @@ const CV = () => {
                   <h3 className="text-xl font-semibold text-primary mb-2">EDUCATION</h3>
                   <div className="space-y-2">
                     <div>
-                      <h4 className="text-lg font-semibold text-foreground">University of Ghana | Legon</h4>
-                      <p className="text-foreground/80">BSC. Information Technology</p>
+                      <h4 className="text-lg font-semibold text-foreground">Humber College — Toronto, Canada</h4>
+                      <p className="text-foreground/80">Computer Programming Diploma</p>
+                      <p className="text-foreground/80">2023 – 2025</p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-semibold text-primary mb-2">CERTIFICATES</h3>
+                  <h3 className="text-xl font-semibold text-primary mb-2">CERTIFICATIONS</h3>
                   <ul className="list-disc list-inside space-y-2 text-foreground/80">
-                    <li>ALX AI Career Essentials Certified</li>
-                    <li>Prodigee Edtech UI/UX Design </li>
+                    <li>ALX AI Career Essentials — Applied AI fundamentals and chatbot systems</li>
                   </ul>
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-semibold text-primary mb-2">LANGUAGES</h3>
-                  <p className="text-foreground/80">English, Twi</p>
+                  <h3 className="text-xl font-semibold text-primary mb-2">TECHNICAL SKILLS</h3>
+                  <div className="space-y-2 text-foreground/80">
+                    <p><span className="font-semibold text-foreground">Automation & AI:</span> n8n, OpenAI API, Webhooks, AI Assistants</p>
+                    <p><span className="font-semibold text-foreground">Frontend:</span> React, TypeScript, Tailwind CSS, Next.js</p>
+                    <p><span className="font-semibold text-foreground">Backend:</span> Node.js, REST APIs, Supabase, PostgreSQL, Firebase</p>
+                    <p><span className="font-semibold text-foreground">Tools:</span> Git/GitHub, Notion, Slack, Google Workspace, Vercel</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -251,15 +280,38 @@ const CV = () => {
               <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-2">Location</h3>
-                  <p className="text-foreground/80">Accra, Ghana</p>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-primary mb-2">Phone</h3>
-                  <p className="text-foreground/80">0593125279</p>
+                  <p className="text-foreground/80">Toronto, Ontario, Canada</p>
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-2">Email</h3>
-                  <p className="text-foreground/80">felixashong4@gmail.com</p>
+                  <p className="text-foreground/80">jeffaddai40@gmail.com</p>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-primary mb-2">Portfolio</h3>
+                  <a
+                    href="https://jeffery-addae-portfolio-web.vercel.app/"
+                    className="text-foreground/80 hover:text-primary transition-colors"
+                  >
+                    jeffery-addae-portfolio-web.vercel.app
+                  </a>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-primary mb-2">LinkedIn</h3>
+                  <a
+                    href="https://www.linkedin.com/in/jeffery-addae-297214398/"
+                    className="text-foreground/80 hover:text-primary transition-colors"
+                  >
+                    linkedin.com/in/jeffery-addae-297214398
+                  </a>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-primary mb-2">GitHub</h3>
+                  <a
+                    href="https://github.com/JefferyAddaeSecB"
+                    className="text-foreground/80 hover:text-primary transition-colors"
+                  >
+                    github.com/JefferyAddaeSecB
+                  </a>
                 </div>
               </div>
             </motion.div>
