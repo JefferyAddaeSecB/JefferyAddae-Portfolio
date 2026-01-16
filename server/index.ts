@@ -25,6 +25,8 @@ import { setupVite } from "./vite";
 import cors from "cors";
 import http from "http";
 import serverless from "serverless-http";
+import schedule from "node-schedule";
+import { completeExpiredAppointmentsJob } from "./jobs/completeAppointments";
 
 const app = express();
 const server = http.createServer(app);
@@ -66,6 +68,20 @@ app.use((req, res, next) => {
 async function initializeServer() {
   try {
     await registerRoutes(app);
+    
+    // Initialize scheduled job to complete expired appointments every 30 minutes
+    // Runs at :00 and :30 of every hour
+    schedule.scheduleJob("*/30 * * * *", async () => {
+      try {
+        console.log("[Scheduled Job] Starting expired appointments completion...");
+        await completeExpiredAppointmentsJob();
+        console.log("[Scheduled Job] ✅ Expired appointments completion finished");
+      } catch (error) {
+        console.error("[Scheduled Job] ❌ Error completing expired appointments:", error);
+        // Don't throw - let the job fail gracefully and retry next run
+      }
+    });
+    console.log("[Scheduled Jobs] Appointment completion job initialized (runs every 30 min)");
     
     // Error handling middleware MUST be after routes
     app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

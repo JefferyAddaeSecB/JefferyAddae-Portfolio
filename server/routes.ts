@@ -5,6 +5,8 @@ import { leadPayloadSchema } from "@shared/lead";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { sendContactEmail } from "./services/email";
+import { handleCalendlyWebhook } from "./webhooks/calendly";
+import { getUpcomingAppointments, getPastAppointments, getAppointmentStats } from "./services/appointments";
 // openai-edge types are optional; define a minimal ChatMessage type here
 type ChatMessage = { role: string; content: string };
 
@@ -347,6 +349,131 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
       return res.status(200).json({ 
         message: "Fallback response",
         response: fallbackPortfolioSummary
+      });
+    }
+  });
+
+  // ========================================
+  // CALENDLY WEBHOOK & APPOINTMENTS API
+  // ========================================
+
+  /**
+   * POST /api/webhooks/calendly
+   * 
+   * Calendly webhook handler
+   * Validates signature and processes invitee events
+   * 
+   * Events:
+   * - invitee.created
+   * - invitee.cancelled
+   * - invitee.rescheduled
+   * 
+   * Response: n8n-compatible JSON
+   */
+  app.post("/api/webhooks/calendly", async (req: Request, res: Response) => {
+    try {
+      const signature = req.headers["x-calendly-signature"] as string;
+      if (!signature) {
+        return res.status(400).json({ 
+          error: "Missing X-Calendly-Signature header" 
+        });
+      }
+
+      const result = await handleCalendlyWebhook(req.body, signature);
+
+      // Return appropriate status code based on result
+      if (result.status === "error") {
+        return res.status(400).json(result);
+      }
+
+      // Success or skipped — both return 200
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Calendly webhook error:", error);
+      return res.status(500).json({
+        status: "error",
+        event_type: "unknown",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  /**
+   * GET /api/appointments/upcoming
+   * 
+   * Fetch upcoming appointments (status = upcoming, startTime > now)
+   * Optional: filter by userId query param
+   * 
+   * Response:
+   * ```json
+   * [
+   *   {
+   *     "appointmentId": "appt_...",
+   *     "email": "user@example.com",
+   *     "startTime": "2025-01-20T14:00:00Z",
+   *     "endTime": "2025-01-20T14:45:00Z",
+   *     "serviceType": "Discovery Call",
+   *     "timezone": "America/New_York",
+   *     "status": "upcoming"
+   *   }
+   * ]
+   * ```
+   */
+  app.get("/api/appointments/upcoming", async (req: Request, res: Response) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const appointments = await getUpcomingAppointments(userId);
+
+      return res.status(200).json({
+        count: appointments.length,
+        data: appointments,
+      });
+    } catch (error) {
+      console.error("Error fetching upcoming appointments:", error);
+      return res.status(500).json({
+        error: "Failed to fetch upcoming appointments",
+      });
+    }
+  });
+
+  /**
+   * GET /api/appointments/past
+   * 
+   * Fetch past appointments (status = completed | cancelled, startTime <= now)
+   * Optional: filter by userId query param
+   * Ordered by startTime descending (most recent first)
+   */
+  app.get("/api/appointments/past", async (req: Request, res: Response) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const appointments = await getPastAppointments(userId);
+
+      return res.status(200).json({
+        count: appointments.length,
+        data: appointments,
+      });
+    } catch (error) {
+      console.error("Error fetching past appointments:", error);
+      return res.status(500).json({
+        error: "Failed to fetch past appointments",
+      });
+    }
+  });
+
+  /**
+   * GET /api/appointments/stats
+   * 
+   * Appointment statistics
+   * Used for monitoring and dashboard
+   */
+  app.get("/api/appointments/stats", async (req: Request, res: Response) => {
+    try {
+      const stats = await getAppointmentStats();
+      return res.status(200).json(stats);
+    } catch (error) {
+      console.error("Error fetching appointment stats:", error);
+      return res.status(500).json({
+        error: "Failed to fetch appointment stats",
       });
     }
   });
