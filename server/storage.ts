@@ -78,7 +78,21 @@ export class MemStorage implements IStorage {
   async createLead(lead: InsertLead): Promise<Lead> {
     const id = this.leadCurrentId++;
     const createdAt = new Date().toISOString();
-    const newLead: Lead = { ...lead, id, createdAt };
+    const newLead: Lead = { 
+      ...lead,
+      id, 
+      createdAt,
+      phone: lead.phone ?? null,
+      company: lead.company ?? null,
+      role: lead.role ?? null,
+      tools: lead.tools ?? null,
+      volumeRange: lead.volumeRange ?? null,
+      timeline: lead.timeline ?? null,
+      budgetRange: lead.budgetRange ?? null,
+      dataSensitivity: lead.dataSensitivity ?? null,
+      preferredContact: lead.preferredContact ?? null,
+      tracking: lead.tracking ?? null,
+    };
     this.leads.set(id, newLead);
     return newLead;
   }
@@ -86,7 +100,12 @@ export class MemStorage implements IStorage {
   async createLeadEvent(event: InsertLeadEvent): Promise<LeadEvent> {
     const id = this.leadEventCurrentId++;
     const createdAt = new Date().toISOString();
-    const newEvent: LeadEvent = { ...event, id, createdAt };
+    const newEvent: LeadEvent = { 
+      ...event, 
+      id, 
+      createdAt,
+      metadata: event.metadata ?? null,
+    };
     this.leadEvents.set(id, newEvent);
     return newEvent;
   }

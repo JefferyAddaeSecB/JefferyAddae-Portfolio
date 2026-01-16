@@ -202,7 +202,7 @@ async function handleInviteeCreated(
     return {
       status: 'success',
       event_type: payload.event,
-      message: 'Duplicate (appointment already exists)',
+      error: 'Duplicate (appointment already exists)',
     };
   }
 

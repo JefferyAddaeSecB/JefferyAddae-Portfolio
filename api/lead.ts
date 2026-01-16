@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { leadPayloadSchema } from "../shared/lead";
-import { getFirestore, isFirebaseConfigured } from "../server/firebase";
+import { leadPayloadSchema } from "../shared/lead.js";
+import { getFirestore, isFirebaseConfigured } from "../server/firebase.js";
 
 const leadRateLimit = new Map<string, { count: number; firstAt: number }>();
 const leadRateWindowMs = 10 * 60 * 1000;
