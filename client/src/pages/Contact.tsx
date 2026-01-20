@@ -41,12 +41,12 @@ const Contact = () => {
         className="flex justify-center"
       >
         <div
-          className="calendly-inline-widget"
+          className="calendly-inline-widget w-full md:w-4/5 lg:w-3/4"
           data-url="https://calendly.com/jeffaddai40/complimentary-strategy-call"
           style={{
             minWidth: "320px",
             height: "700px",
-            maxWidth: "100%",
+            maxWidth: "1000px",
           }}
         />
       </motion.div>
