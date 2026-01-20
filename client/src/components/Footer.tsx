@@ -16,9 +16,9 @@ const Footer = () => {
             I help businesses remove manual work by building AI automation systems,
             internal tools, and scalable web platforms that save time and increase ROI.
           </p>
-          <Link href="/contact">
+          <Link href="/contact#form">
             <span className="inline-block px-8 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
-              Let’s Talk
+              Let's Talk
             </span>
           </Link>
         </div>
