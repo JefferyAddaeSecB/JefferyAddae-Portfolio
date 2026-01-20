@@ -24,9 +24,6 @@ const Header = () => {
 
   const isActive = (path: string) => location === path;
 
-  // Special: "Services" should scroll to section on Home
-  const servicesHref = "/#services";
-
   const auditMailto =
     "mailto:jeffaddai40@gmail.com?subject=Free%20ROI%20Automation%20Audit&body=Hi%20Jeffery%2C%0A%0AI%20want%20a%20quick%20ROI%20audit.%20Here%E2%80%99s%20what%20we%20do%20manually%3A%0A1)%20...%0A2)%20...%0A%0ATools%20we%20use%3A%20(Gmail%2C%20Sheets%2C%20HubSpot%2C%20etc.)%0A%0AWhere%20we%20lose%20time%2Fmoney%3A%20...%0A%0AThanks!";
 
@@ -60,17 +57,6 @@ const Header = () => {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-8">
-            {/* Services scroll link */}
-            <a href={servicesHref}>
-              <motion.span
-                className="relative px-2 py-1 text-sm font-medium transition-colors cursor-pointer inline-block text-muted-foreground hover:text-foreground"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Services
-              </motion.span>
-            </a>
-
             {navItems.map((item) => (
               <Link key={item.path} href={item.path}>
                 <motion.span
@@ -141,14 +127,6 @@ const Header = () => {
               className="md:hidden"
             >
               <div className="py-4 space-y-2">
-                <a
-                  href={servicesHref}
-                  className="block px-4 py-2 text-base font-medium text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Services
-                </a>
-
                 {navItems.map((item) => (
                   <Link key={item.path} href={item.path}>
                     <motion.span
