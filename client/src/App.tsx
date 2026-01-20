@@ -17,7 +17,6 @@ const ProjectCaseStudy = lazy(() => import("@/pages/ProjectCaseStudy"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const CV = lazy(() => import("@/pages/CV"));
 const Experience = lazy(() => import("@/pages/Experience"));
-const Appointments = lazy(() => import("@/pages/Appointments"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CursorPatternBackground = lazy(() => import("@/components/CursorPatternBackground"));
 const AIPortfolioAssistant = lazy(() =>
@@ -67,7 +66,6 @@ function Router() {
             <Route path="/experience" component={Experience} />
             <Route path="/contact" component={Contact} />
             <Route path="/cv" component={CV} />
-            <Route path="/appointments" component={Appointments} />
             {/* Fallback to 404 */}
             <Route component={NotFound} />
           </Switch>
