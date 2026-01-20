@@ -34,16 +34,29 @@ const RouteScrollReset = () => {
   }, []);
 
   useLayoutEffect(() => {
-    // Belt-and-suspenders: reset scroll immediately, next frame, and after paint
-    const reset = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    };
+    // Check if there's a hash in the URL
+    const hash = window.location.hash;
+    
+    if (hash) {
+      // If there's a hash, scroll to that element
+      setTimeout(() => {
+        const element = document.querySelector(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    } else {
+      // Otherwise reset scroll to top
+      const reset = () => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      };
 
-    reset();
-    requestAnimationFrame(reset);
-    setTimeout(reset, 0);
+      reset();
+      requestAnimationFrame(reset);
+      setTimeout(reset, 0);
+    }
   }, [location]);
 
   return null;
