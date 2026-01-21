@@ -127,52 +127,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Above-the-fold CTA */}
-      <section className="py-20 relative z-10">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="bg-gradient-to-br from-primary/90 to-blue-600 rounded-3xl p-10 md:p-14 text-white relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-grid-white/10" />
-            <div className="absolute -top-24 -right-24 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-
-            <div className="relative z-10 text-center md:text-left">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                Free 45-minute Strategy Call
-              </h2>
-
-              <p className="text-lg md:text-xl mb-8 opacity-95 max-w-3xl">
-                I’ll map one workflow you can automate this week and give you a clear build plan.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-                <Link href="/contact">
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-8 py-4 bg-white text-primary rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all duration-300"
-                  >
-                    Book Free 45-minute Strategy Call
-                  </motion.button>
-                </Link>
-
-                <a
-                  href="mailto:jeffaddai40@gmail.com"
-                  className="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 text-white rounded-xl font-semibold hover:bg-white/20 transition-all duration-300 text-center"
-                >
-                  Send My Workflow
-                </a>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
       {/* Services Section */}
       <section className="py-20 bg-muted/30 relative z-10">
         <div className="container mx-auto px-4 max-w-6xl">
@@ -383,51 +337,6 @@ const Home = () => {
         </Link>
       </div>
     </div>
-  </div>
-</section>
-      {/* CTA Section */}
-<section className="py-20 relative z-10">
-  <div className="container mx-auto px-4 max-w-5xl">
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-      className="bg-gradient-to-br from-primary/90 to-blue-600 rounded-3xl p-10 md:p-14 text-white relative overflow-hidden"
-    >
-      <div className="absolute inset-0 bg-grid-white/10" />
-      <div className="absolute -top-24 -right-24 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-
-      <div className="relative z-10">
-        <h2 className="text-3xl md:text-5xl font-bold mb-4">
-          Free 45-minute Strategy Call
-        </h2>
-
-        <p className="text-lg md:text-xl mb-8 opacity-95 max-w-3xl">
-          I help businesses replace repetitive work with AI automation systems that save time and increase ROI.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-          <Link href="/contact">
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-8 py-4 bg-white text-primary rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all duration-300"
-            >
-              Book Free 45-minute Strategy Call
-            </motion.button>
-          </Link>
-
-          <a
-            href="mailto:jeffaddai40@gmail.com"
-            className="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 text-white rounded-xl font-semibold hover:bg-white/20 transition-all duration-300 text-center"
-          >
-            Email Details
-          </a>
-        </div>
-      </div>
-    </motion.div>
   </div>
 </section>
     </div>
