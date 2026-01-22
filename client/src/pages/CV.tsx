@@ -5,14 +5,19 @@ const CV = () => {
   // Function to handle CV download
   const handleDownloadCV = async () => {
     try {
-      // Fetch the PDF file
+      // Fetch the PDF file from public/assets
       const response = await fetch('/assets/CV.pdf');
       if (!response.ok) {
-        throw new Error('Failed to fetch PDF file');
+        throw new Error(`Failed to fetch PDF file: ${response.statusText}`);
       }
       
       // Convert the response to a blob
       const blob = await response.blob();
+      
+      // Verify blob is valid
+      if (blob.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
       
       // Create a blob URL
       const blobUrl = window.URL.createObjectURL(blob);
@@ -199,7 +204,7 @@ const CV = () => {
                     <div>
                       <div className="flex justify-between mb-1">
                         <h4 className="text-lg font-semibold text-foreground">AI Automation Engineer & Full-Stack Developer</h4>
-                        <span className="text-primary">2023 – Present</span>
+                        <span className="text-primary">Mar 2024 – Present</span>
                       </div>
                       <p className="text-foreground/80 mb-2">Freelance / Contract — Remote</p>
                       <ul className="list-disc list-inside space-y-2 text-foreground/80">
@@ -213,12 +218,12 @@ const CV = () => {
                     
                     <div>
                       <div className="flex justify-between mb-1">
-                        <h4 className="text-lg font-semibold text-foreground">Full-Stack Developer</h4>
-                        <span className="text-primary">2022 – 2023</span>
+                        <h4 className="text-lg font-semibold text-foreground">Full-Stack Developer | Tech Lead</h4>
+                        <span className="text-primary">July 2024 – Present</span>
                       </div>
-                      <p className="text-foreground/80 mb-2">Digital Solutions Projects — Remote</p>
+                      <p className="text-foreground/80 mb-2">CEMAR Counseling — Remote</p>
                       <ul className="list-disc list-inside space-y-2 text-foreground/80">
-                        <li>Developed full-stack web applications using React, TypeScript, Node.js, and Supabase.</li>
+                        <li>Developed full-stack web applications using React, TypeScript, Node.js, and Firebase.</li>
                         <li>Designed RESTful APIs and integrated cloud services for authentication, storage, and data sync.</li>
                         <li>Improved application performance through modular architecture and optimization.</li>
                       </ul>
@@ -227,9 +232,9 @@ const CV = () => {
                     <div>
                       <div className="flex justify-between mb-1">
                         <h4 className="text-lg font-semibold text-foreground">Junior Web Developer</h4>
-                        <span className="text-primary">2021 – 2022</span>
+                        <span className="text-primary">Feb 2024 – Oct 2024</span>
                       </div>
-                      <p className="text-foreground/80 mb-2">Project-Based Work — Remote</p>
+                      <p className="text-foreground/80 mb-2">Africa Startup Academy — Remote</p>
                       <ul className="list-disc list-inside space-y-2 text-foreground/80">
                         <li>Built responsive UI components using React and Tailwind CSS.</li>
                         <li>Assisted with API integrations and backend feature development.</li>
@@ -243,9 +248,9 @@ const CV = () => {
                   <h3 className="text-xl font-semibold text-primary mb-2">EDUCATION</h3>
                   <div className="space-y-2">
                     <div>
-                      <h4 className="text-lg font-semibold text-foreground">Humber College — Toronto, Canada</h4>
-                      <p className="text-foreground/80">Computer Programming Diploma</p>
-                      <p className="text-foreground/80">2023 – 2025</p>
+                      <h4 className="text-lg font-semibold text-foreground">Humber College — Etobicoke, Canada</h4>
+                      <p className="text-foreground/80">Diploma in Computer Programming</p>
+                      <p className="text-foreground/80">Jan 2023 – Aug 2025</p>
                     </div>
                   </div>
                 </div>
@@ -255,6 +260,7 @@ const CV = () => {
                   <ul className="list-disc list-inside space-y-2 text-foreground/80">
                     <li>ALX AI Career Essentials — Applied AI fundamentals and chatbot systems</li>
                   </ul>
+                  <p className="text-foreground/80 mt-2 text-sm">Feb 2024</p>
                 </div>
 
                 <div>

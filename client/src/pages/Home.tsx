@@ -227,10 +227,10 @@ const Home = () => {
 
         <div className="grid grid-cols-2 gap-4">
           {[
-            { name: "n8n", icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/n8n.svg", invert: true },
-            { name: "OpenAI", icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/openai.svg", invert: true },
-            { name: "LangChain", icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/langchain.svg", invert: true },
-            { name: "Zapier", icon: "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/zapier.svg", invert: true },
+            { name: "n8n", icon: "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/n8n.svg", color: "#ff0000" },
+            { name: "OpenAI", icon: "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/openai.svg", color: "#412991" },
+            { name: "LangChain", icon: "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/langchain.svg", color: "#0ea5e9" },
+            { name: "Zapier", icon: "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/zapier.svg", color: "#ff4f00" },
           ].map((t) => (
             <motion.div
               key={t.name}
@@ -240,11 +240,9 @@ const Home = () => {
               whileHover={{ scale: 1.02 }}
               className="bg-background/40 rounded-xl p-4 border border-border hover:border-primary/50 transition-all duration-300 flex items-center gap-3"
             >
-              <img
-                src={t.icon}
-                alt={t.name}
-                className={`w-8 h-8 object-contain ${t.invert ? "dark:invert" : ""}`}
-              />
+              <div style={{ width: "32px", height: "32px", backgroundColor: t.color, borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <img src={t.icon} alt={t.name} className="w-6 h-6 rounded invert" />
+              </div>
               <span className="text-sm font-medium text-foreground">{t.name}</span>
             </motion.div>
           ))}

@@ -5,6 +5,26 @@ const Contact = () => {
   const [typeformLoaded, setTypeformLoaded] = useState(false);
 
   useEffect(() => {
+    // Polyfill for crypto.randomUUID if not available
+    if (!crypto.randomUUID) {
+      crypto.randomUUID = function() {
+        const hex = "0123456789abcdef";
+        let result = "";
+        for (let i = 0; i < 36; i++) {
+          if (i === 8 || i === 13 || i === 18 || i === 23) {
+            result += "-";
+          } else if (i === 14) {
+            result += "4";
+          } else if (i === 19) {
+            result += hex[(Math.random() * 4 | 0 | 0x8)];
+          } else {
+            result += hex[Math.random() * 16 | 0];
+          }
+        }
+        return result as `${string}-${string}-${string}-${string}-${string}`;
+      };
+    }
+
     // Load Calendly script
     const calendlyScript = document.createElement("script");
     calendlyScript.src = "https://assets.calendly.com/assets/external/widget.js";
@@ -41,7 +61,7 @@ const Contact = () => {
           Book Your Free 45-Minute Strategy Call
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-          Pick a time that works for you. I'll walk you through automation opportunities specific to your business.
+          Pick a time that works for you. I'll walk you through where automation can save time, reduce cost, and unlock scale in your business.
         </p>
       </motion.div>
 
@@ -67,14 +87,87 @@ const Contact = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
-        className="text-center mt-12"
+        className="text-center mt-12 mb-16"
       >
-        <p className="text-sm text-muted-foreground">
-          In 45 minutes, I'll map your automation opportunities + next steps.
-        </p>
-        <p className="text-xs text-muted-foreground mt-2">
+        <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-6">What We'll Actually Cover</h3>
+        <div className="max-w-2xl mx-auto text-left">
+          <p className="text-muted-foreground mb-6 text-base">In this call, we will:</p>
+          <ul className="space-y-3 text-foreground/80">
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">•</span>
+              <span>Identify your biggest workflow bottlenecks</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">•</span>
+              <span>Map 1–3 automation opportunities with ROI potential</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">•</span>
+              <span>Decide what should be automated now vs later</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">•</span>
+              <span>Outline tools, timelines, and complexity</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">•</span>
+              <span>Decide if it makes sense to work together</span>
+            </li>
+          </ul>
+        </div>
+        <p className="text-xs text-muted-foreground mt-6">
           No spam. No sales pressure. Just systems thinking.
         </p>
+      </motion.div>
+
+      {/* Who This Is Best For Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="max-w-4xl mx-auto mb-16 grid grid-cols-1 md:grid-cols-2 gap-8"
+      >
+        <div className="bg-card rounded-lg p-6 border border-border">
+          <h3 className="text-lg sm:text-xl font-bold text-primary mb-4">Who This Is Best For</h3>
+          <p className="text-muted-foreground mb-4 font-semibold">This is a good fit if you:</p>
+          <ul className="space-y-3 text-foreground/80">
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">✓</span>
+              <span>Run a service business, agency, or SaaS</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">✓</span>
+              <span>Are wasting time on manual admin, follow-ups, or data entry</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">✓</span>
+              <span>Use tools like Google Sheets, CRMs, Calendly, email, or forms</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-primary font-bold">✓</span>
+              <span>Want systems that scale — not duct-tape automation</span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="bg-card rounded-lg p-6 border border-border">
+          <h3 className="text-lg sm:text-xl font-bold text-primary mb-4">This May Not Be A Fit If</h3>
+          <p className="text-muted-foreground mb-4 font-semibold">You're only looking for:</p>
+          <ul className="space-y-3 text-foreground/80">
+            <li className="flex items-start gap-3">
+              <span className="text-muted-foreground font-bold">✗</span>
+              <span>One-off Zapier zaps</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-muted-foreground font-bold">✗</span>
+              <span>DIY tutorials</span>
+            </li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-6">
+            If that's your need, I'm happy to point you toward free resources instead.
+          </p>
+        </div>
       </motion.div>
 
       {/* Divider */}
