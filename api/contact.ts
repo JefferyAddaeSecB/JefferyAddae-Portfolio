@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 const ContactSchema = z.object({
   name: z.string().min(2),
