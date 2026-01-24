@@ -8,55 +8,56 @@ const HowItWorks: React.FC = () => {
     {
       number: 1,
       title: "Automation Audit",
-      description: "We identify your biggest workflow bottlenecks, map out automation opportunities, and calculate potential ROI.",
+      description: "I identify your biggest workflow bottlenecks, map out automation opportunities, and calculate potential ROI.",
       icon: FaChartLine,
       timeline: "30–45 minutes",
       details: [
         "Walk through your current processes",
         "Identify 2–3 high-impact automation candidates",
         "Estimate time/cost savings",
-        "Determine feasibility and tooling needed"
+        "Determine feasibility and tooling needed",
+        "You leave with: workflow map + top 3 automation opportunities ranked by ROI + rollout plan"
       ]
     },
     {
       number: 2,
       title: "Design & Build",
-      description: "We design the automation system, set up integrations, and deploy it in n8n with proper error handling and logging.",
+      description: "I design the automation system, set up integrations, and deploy it in n8n with proper error handling and logging.",
       icon: FaCog,
       timeline: "1–3 weeks",
       details: [
         "Design workflow map & process flow",
         "Set up integrations (CRM, email, forms, Slack, etc.)",
-        "Build automation logic in n8n",
-        "Add error handling, retries, and logging",
-        "Create runbooks and documentation"
+        "Build automation logic in n8n with error handling",
+        "Add retry logic, logging, and monitoring",
+        "Create comprehensive documentation and runbooks"
       ]
     },
     {
       number: 3,
       title: "Deploy & Iterate",
-      description: "We deploy the system, train your team, monitor performance, and continuously optimize based on real-world data.",
+      description: "I deploy the system, train your team, monitor performance, and continuously optimize based on real-world data.",
       icon: FaCheckCircle,
       timeline: "Ongoing",
       details: [
         "Deploy to production environment",
         "Train your team on system usage",
-        "Monitor execution logs and errors",
-        "Weekly check-ins and refinements",
-        "Scale additional workflows as needed"
+        "Set up monitoring, alerts, and execution logs",
+        "Weekly check-ins and performance reviews",
+        "Iterate based on real usage data and feedback"
       ]
     }
   ];
 
   const deliverables = [
-    "Workflow map & architecture diagram",
-    "n8n automation system (fully functional)",
+    "Workflow map + architecture diagram",
     "Integrations set up (CRM, email, forms, Slack, etc.)",
-    "Error handling & retry logic",
-    "Execution logs & monitoring dashboard",
-    "Video walkthrough (Loom recording)",
-    "Written documentation & runbooks",
-    "Handoff & team training"
+    "Execution logs + monitoring dashboard",
+    "Written documentation + runbooks",
+    "Production n8n automation system (tested)",
+    "Error handling + retry logic + alerts",
+    "Loom walkthrough (handoff video)",
+    "Team training + support window (14–30 days)"
   ];
 
   const timelines = [
@@ -113,7 +114,7 @@ const HowItWorks: React.FC = () => {
           className="text-center mb-16 sm:mb-20"
         >
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            How We Build Automation That Actually Sticks
+            How I Build Automation That Actually Sticks
           </h1>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-8">
             From audit to deployment, a proven process that turns manual work into scalable systems.
@@ -176,6 +177,64 @@ const HowItWorks: React.FC = () => {
                 </motion.div>
               );
             })}
+          </div>
+        </motion.div>
+
+        {/* WHAT THIS LOOKS LIKE IN REAL LIFE */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mb-16 sm:mb-20"
+        >
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+              What This Looks Like in Real Life
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              A few common automation flows I build for service businesses and SaaS teams.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-card/50 border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground mb-3">Lead Intake Flow</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>Lead Intake → Auto-qualify</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>CRM Update → Booked Call</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card/50 border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground mb-3">Support Requests</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>Support Requests → AI Triage</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>Assign Owner → Follow-up SLA Reminders</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card/50 border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground mb-3">Ops Reporting</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>Ops Reporting → Data Sync</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-primary rounded-full"></span>
+                  <span>Weekly Dashboard → Slack Alerts</span>
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
 
@@ -243,10 +302,8 @@ const HowItWorks: React.FC = () => {
               </div>
             ))}
           </div>
-          <p className="text-center text-sm text-muted-foreground mt-8 max-w-3xl mx-auto">
-            <span className="font-semibold">Note:</span> These are typical ranges based on scope and complexity. 
-            Exact timelines depend on your specific workflows, tooling, and team availability. We'll provide a 
-            detailed timeline after the initial audit.
+          <p className="text-center text-sm text-muted-foreground mt-6 max-w-2xl mx-auto">
+            Exact timelines depend on integrations, data quality, and approval speed.
           </p>
         </motion.div>
 

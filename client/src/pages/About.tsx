@@ -23,8 +23,7 @@ const About: React.FC = () => {
           Built to Eliminate Manual Work — Not Add More Software
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          I help service businesses and SaaS teams automate high-friction workflows so they save hours every week,
-          reduce errors, and scale without hiring.
+          Most businesses have workflow problems, not tool problems. I eliminate manual handoffs, silent failures, and disconnected systems that slow teams down.
         </p>
       </motion.div>
 
@@ -52,14 +51,14 @@ const About: React.FC = () => {
           className="space-y-6"
         >
           <h2 className="text-2xl sm:text-2xl font-bold text-foreground">
-            {BIO.tagline}
+            AI Automation Specialist & Full-Stack Engineer
           </h2>
 
           <p className="text-muted-foreground text-sm sm:text-base">
-            I run a focused automation practice where I personally design and ship systems. I work with growing service businesses and SaaS teams that are stuck doing repetitive manual work — lead intake, follow-ups, reporting, and internal operations. My job is to turn those processes into automated systems that run quietly in the background.
+            I believe automation must be observable, recoverable, and documented. Every system I build includes error handling, retries, alerts, and runbooks for handoff.
           </p>
           <p className="text-muted-foreground text-sm sm:text-base">
-            I'm not interested in automation for automation's sake. I build reliable systems that actually save time, reduce operational drag, and deliver measurable ROI.
+            This founder-led approach disqualifies low-budget clients seeking quick hacks. I focus on production-grade systems that scale and maintain themselves.
           </p>
 
           {/* What you do (ROI) */}
@@ -67,10 +66,10 @@ const About: React.FC = () => {
             <h3 className="text-lg font-bold text-foreground mb-3">What I help businesses do</h3>
             <div className="space-y-3">
               {[
-                "Eliminate repetitive workflows across lead intake, follow-ups, and internal ops",
-                "Centralize tools (CRM, forms, email, spreadsheets, databases) into one system",
-                "Deploy AI-powered workflows that respond instantly and reduce support load",
-                "Scale internal tools and platforms without increasing headcount",
+                "Replace manual lead chasing with instant qualification and routing",
+                "Reduce support tickets by 60% through AI-powered responses",
+                "Scale operations from 10 to 100 customers without adding staff",
+                "Cut reporting time from days to automated dashboards",
               ].map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <div className="mt-1 flex-shrink-0">
@@ -96,7 +95,11 @@ const About: React.FC = () => {
           {/* My Approach (keep your BIO.philosophy) */}
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-foreground">My Approach</h3>
-            {BIO.philosophy.map((item, index) => (
+            {[
+              "Automate before hiring",
+              "Remove bottlenecks instead of hiding them",
+              "Ship fast, monitor aggressively, iterate based on usage"
+            ].map((item, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="mt-1 flex-shrink-0">
                   <svg

@@ -39,12 +39,12 @@ const Home = () => {
               </h1>
 
               <p className="text-lg text-muted-foreground mb-2 max-w-xl mx-auto lg:mx-0">
-                I build n8n + AI workflows that remove manual work from lead intake, follow-ups, reporting, and internal ops. Built for service businesses and SaaS teams that want to scale without hiring.
+                I design and deploy production-ready AI automation systems using n8n that eliminate manual work across lead intake, follow-ups, reporting, and internal operations — so service businesses and SaaS teams can scale without hiring.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 mb-6 justify-center lg:justify-start">
                 <span className="text-xs uppercase tracking-wide text-muted-foreground">Best for</span>
-                {["Agencies", "Service Businesses", "SaaS Teams"].map((item) => (
+                {["Service Businesses", "SaaS Teams", "Agencies"].map((item) => (
                   <span
                     key={item}
                     className="px-3 py-1 rounded-full bg-card border border-border text-sm text-foreground"
@@ -61,7 +61,7 @@ const Home = () => {
                     whileTap={{ scale: 0.95 }}
                     className="px-8 py-4 bg-primary text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    Get ROI Audit
+                    Automation ROI Audit
                   </motion.button>
                 </Link>
                 <Link href="/projects">
@@ -70,7 +70,7 @@ const Home = () => {
                     whileTap={{ scale: 0.95 }}
                     className="px-8 py-4 bg-card border-2 border-primary text-primary rounded-xl font-semibold hover:bg-primary hover:text-white transition-all duration-300"
                   >
-                    See Case Studies
+                    View Case Studies
                   </motion.button>
                 </Link>
               </div>
@@ -85,19 +85,19 @@ const Home = () => {
                   <div className="text-3xl font-bold text-primary">
                     <CountUp end={2} suffix="+" />
                   </div>
-                  <div className="text-sm text-muted-foreground">Years Exp.</div>
+                  <div className="text-sm text-muted-foreground">Production Systems Shipped</div>
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-primary">
                     <CountUp end={3} suffix="+" />
                   </div>
-                  <div className="text-sm text-muted-foreground">Projects</div>
+                  <div className="text-sm text-muted-foreground">Automation Systems Built</div>
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-primary">
                     <CountUp end={3} suffix="+" />
                   </div>
-                  <div className="text-sm text-muted-foreground">Clients</div>
+                  <div className="text-sm text-muted-foreground">Businesses Automated</div>
                 </div>
               </div>
             </motion.div>
@@ -137,10 +137,10 @@ const Home = () => {
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              What I <span className="text-primary">Do</span>
+              Automation Systems I <span className="text-primary">Build for Clients</span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Specializing in full-stack development and AI automation systems that streamline business workflows
+              Proven automation patterns that remove manual work and keep operations running without constant oversight.
             </p>
           </motion.div>
 
@@ -153,8 +153,8 @@ const Home = () => {
                     <path d="M2 19h20" />
                   </svg>
                 ),
-                title: "Custom Internal Tools",
-                desc: "Replace manual steps with tailored tools that keep teams fast and consistent.",
+                title: "Lead Intake & Qualification Systems",
+                desc: "Automatically capture, qualify, and route leads from forms, email, and CRMs so no opportunities fall through the cracks.",
               },
               {
                 icon: (
@@ -162,8 +162,8 @@ const Home = () => {
                     <path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.7-1.4A4 4 0 0 1 17 18H7z" />
                   </svg>
                 ),
-                title: "Scalable Systems That Don’t Break",
-                desc: "Reliable automation pipelines with logging, alerts, and clean handoffs.",
+                title: "Scalable Automation That Doesn't Break",
+                desc: "Reliable workflows with logging, retries, alerts, and clean handoffs — built to run quietly in the background.",
               },
               {
                 icon: (
@@ -174,8 +174,8 @@ const Home = () => {
                     <path d="M15 9h6v6h-6z" />
                   </svg>
                 ),
-                title: "Automate Repetitive Work",
-                desc: "Automate lead intake, follow-ups, reporting, and internal workflows using AI and n8n.",
+                title: "Internal Ops & Reporting Automation",
+                desc: "Replace spreadsheets and inbox chaos with structured workflows for follow-ups, approvals, reporting, and internal requests.",
               },
             ].map((service, index) => (
               <motion.div
@@ -211,7 +211,7 @@ const Home = () => {
         Tools I Use to <span className="text-primary">Ship Results</span>
       </h2>
       <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
-        These are production tools I use to deploy automations that save teams time within days — not months.
+        These are production tools I use to deploy reliable automation systems in days — not months.
       </p>
     </motion.div>
 
@@ -324,12 +324,12 @@ const Home = () => {
       <div className="flex gap-3">
         <Link href="/projects">
           <button className="px-5 py-2.5 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all">
-            See Proof
+            View Case Studies
           </button>
         </Link>
         <Link href="/contact">
           <button className="px-5 py-2.5 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all">
-            Book Free 45-minute Strategy Call
+            Book Free 45-minute Automation ROI Audit
           </button>
         </Link>
       </div>

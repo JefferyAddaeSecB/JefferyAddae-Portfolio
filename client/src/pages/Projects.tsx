@@ -16,6 +16,7 @@ type ProjectCategory =
 const Projects = () => {
   const [filter, setFilter] = useState<ProjectCategory>("All");
   const [filteredProjects, setFilteredProjects] = useState(PROJECTS);
+  const [activeUseCase, setActiveUseCase] = useState<string | null>(null);
 
   useEffect(() => {
     if (filter === "All") {
@@ -24,6 +25,88 @@ const Projects = () => {
       setFilteredProjects(PROJECTS.filter(project => project.category === filter));
     }
   }, [filter]);
+
+  // Handle hash-based scrolling
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      setTimeout(() => {
+        const element = document.querySelector(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, []);
+
+  const useCases = [
+    {
+      slug: "ai-powered-lead-intake-qualification-system",
+      title: "AI-Powered Lead Intake & Qualification System",
+      category: "Lead Automation",
+      oneSentence: "Automatically capture, qualify, and route inbound leads so no opportunities fall through the cracks.",
+      problem: "Businesses lose leads and time due to manual follow-ups and unstructured inquiries. Teams spend hours sorting through form submissions, emails, and chat messages to identify qualified prospects.",
+      systemBuilt: "Built with n8n workflows that integrate AI qualification, automated routing, and structured follow-ups. The system processes leads 24/7 without human intervention.",
+      outcome: "Faster response times, higher lead conversion rates, and scalable lead handling as business grows.",
+      tools: ["n8n", "OpenAI", "Supabase", "React", "Node.js"],
+      integrations: ["HubSpot", "Zapier", "Google Forms", "Slack"]
+    },
+    {
+      slug: "internal-ops-request-routing-approvals",
+      title: "Internal Ops Request Routing & Approvals",
+      category: "Internal Ops",
+      oneSentence: "Centralize internal requests and automate routing based on type, priority, and team capacity.",
+      problem: "Teams lose time routing internal requests through email and spreadsheets. Managers spend hours tracking approvals and status updates across multiple channels.",
+      systemBuilt: "Centralized request intake with intelligent routing based on request type, priority, and team capacity. Automated approval workflows with real-time status tracking.",
+      outcome: "Less email back-and-forth, faster internal delivery, and clear visibility into request status and bottlenecks.",
+      tools: ["n8n", "Notion", "Slack", "PostgreSQL", "Node.js"],
+      integrations: ["Google Workspace", "Microsoft Teams", "Jira", "Trello"]
+    },
+    {
+      slug: "ai-support-assistant-ticket-triage",
+      title: "AI Support Assistant & Ticket Triage",
+      category: "AI Assistant",
+      oneSentence: "AI-powered knowledge base with instant answers and intelligent ticket routing.",
+      problem: "Support teams drown in repetitive questions and slow response times. Customers wait hours for answers to common questions while support staff handles complex issues.",
+      systemBuilt: "AI-powered knowledge base with natural language processing, intelligent escalation rules, and seamless CRM integration for complete ticket lifecycle management.",
+      outcome: "Faster first response, reduced support team workload, and consistent responses from knowledge base.",
+      tools: ["OpenAI", "n8n", "Zendesk", "Supabase"],
+      integrations: ["Intercom", "Freshdesk", "Salesforce", "HubSpot"]
+    },
+    {
+      slug: "automated-reporting-executive-dashboards",
+      title: "Automated Reporting & Executive Dashboards",
+      category: "Backend Automation",
+      oneSentence: "Data pipeline that aggregates from multiple sources and generates executive-ready dashboards.",
+      problem: "Reporting takes days because data lives in siloed tools. Executives lack real-time visibility into key metrics and trends.",
+      systemBuilt: "Data pipeline that aggregates from multiple sources, transforms data automatically, and generates executive-ready dashboards with alerting capabilities.",
+      outcome: "Always-on reporting without manual data exports, real-time business intelligence, and data-driven decisions.",
+      tools: ["n8n", "PostgreSQL", "Metabase", "Node.js"],
+      integrations: ["Google Analytics", "Stripe", "QuickBooks", "Tableau"]
+    },
+    {
+      slug: "client-intake-onboarding-automation",
+      title: "Client Intake & Onboarding Automation",
+      category: "Client Intake System",
+      oneSentence: "Document collection workflow with automated task creation and triggered communication sequences.",
+      problem: "New clients slip through the cracks without consistent onboarding. Teams struggle to collect required documents and maintain consistent communication.",
+      systemBuilt: "Document collection workflow with automated task creation, timeline management, and triggered communication sequences for smooth client onboarding.",
+      outcome: "Smoother onboarding, fewer dropped handoffs, standardized process for all clients, and consistent client experience.",
+      tools: ["n8n", "Google Workspace", "Notion", "Slack"],
+      integrations: ["DocuSign", "Dropbox", "Calendly", "Zoom"]
+    },
+    {
+      slug: "revenue-ops-crm-sync-enrichment-pipeline",
+      title: "Revenue Ops CRM Sync & Enrichment Pipeline",
+      category: "Revenue Ops",
+      oneSentence: "Lead enrichment pipeline with automated CRM updates and intelligent deal tracking.",
+      problem: "Revenue teams lose pipeline visibility when CRM data is incomplete or stale. Sales reps struggle with inconsistent lead information and deal tracking.",
+      systemBuilt: "Lead enrichment pipeline with firmographic data, automated CRM updates, deal stage tracking, and intelligent alerting for sales team action.",
+      outcome: "Cleaner CRM data, faster pipeline decisions, proactive alerts for stalled deals, and complete lead lifecycle tracking.",
+      tools: ["n8n", "HubSpot", "Clearbit", "Slack", "PostgreSQL"],
+      integrations: ["Salesforce", "Pipedrive", "ZoomInfo", "LinkedIn Sales Navigator"]
+    }
+  ];
 
   const categories: ProjectCategory[] = [
     "All",
@@ -45,12 +128,12 @@ const Projects = () => {
   };
 
   const patterns = [
-    { title: "Lead Intake & Qualification", slug: "lead-intake-qualification-system" },
-    { title: "CRM Sync & Enrichment", slug: "revenue-ops-crm-enrichment" },
-    { title: "AI Email Follow-Ups", slug: "ai-support-assistant-triage" },
-    { title: "Internal Ops Automation", slug: "internal-ops-request-routing" },
-    { title: "Reporting & Dashboards", slug: "automated-reporting-dashboards" },
-    { title: "AI Assistants for Support & Ops", slug: "ai-support-assistant-triage" },
+    { title: "Lead Intake & Qualification", slug: "ai-powered-lead-intake-qualification-system" },
+    { title: "Internal Ops Request Routing", slug: "internal-ops-request-routing-approvals" },
+    { title: "AI Support Assistant", slug: "ai-support-assistant-ticket-triage" },
+    { title: "Automated Reporting", slug: "automated-reporting-executive-dashboards" },
+    { title: "Client Intake Automation", slug: "client-intake-onboarding-automation" },
+    { title: "Revenue Ops CRM Sync", slug: "revenue-ops-crm-sync-enrichment-pipeline" },
   ];
 
   return (
@@ -66,21 +149,17 @@ const Projects = () => {
             Case Studies: Automation Systems That Save Time & Scale
           </h1>
           <p className="text-muted-foreground text-base sm:text-lg max-w-3xl mx-auto">
-            These are production-ready systems I’ve built to automate lead intake, internal operations, reporting, and
-            customer workflows — the same patterns I deploy for clients.
-          </p>
-          <p className="text-muted-foreground text-sm mt-3">
-            Each project is a reusable automation framework — the same systems I deploy for paying clients.
+            These are real automation systems I've built to eliminate manual work across lead intake, internal ops, reporting, and follow-ups — the same repeatable patterns I deploy for client businesses.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
             <a
               href="/contact"
               className="px-6 py-3 rounded-xl bg-primary text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              Get ROI Audit
+              Book Automation ROI Audit
             </a>
             <a
-              href="#use-cases"
+              href="#automation-patterns"
               className="px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all duration-300"
             >
               View Use Cases
@@ -110,94 +189,108 @@ const Projects = () => {
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-          {filteredProjects.map((project, index) => (
-            <motion.div
-              key={project.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              id={`project-${project.slug}`}
-              className="bg-card rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border border-border"
-            >
-              <div className="relative w-full h-48 overflow-hidden">
-                <img
-                  src={project.image}
-                  alt={project.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-3 left-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeClasses[project.category as Exclude<ProjectCategory, "All">]}`}
-                  >
-                    {project.category}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-5 sm:p-6 space-y-4">
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2">
-                    {project.title}
-                  </h3>
-                  <p className="text-muted-foreground text-sm sm:text-base">
-                    {project.problem}
-                  </p>
-                </div>
-
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {project.bullets.map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 border-l-4 border-l-primary">
-                  <p className="text-sm text-primary">
-                    <span className="font-semibold">Automation Pattern:</span> {project.automationPattern}
-                  </p>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  {project.techStack.join(" · ")}
-                </p>
-
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {project.bestFor ? (
-                    <p>
-                      <span className="font-semibold text-foreground">Best for:</span> {project.bestFor}
-                    </p>
-                  ) : null}
-                  {project.outcome ? (
-                    <p>
-                      <span className="font-semibold text-foreground">Outcome:</span> {project.outcome}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href={`/projects/${project.slug}`}>
-                    <span className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
-                      View Case Study
-                    </span>
-                  </Link>
-                  {project.link ? (
-                    <a
-                      href={project.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all"
+          {filteredProjects.map((project, index) => {
+            const projectSlug = project.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            return (
+              <motion.div
+                key={project.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                id={`project-${projectSlug}`}
+                className="bg-card rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border border-border"
+              >
+                <div className="relative w-full h-48 overflow-hidden">
+                  <img
+                    src={project.image}
+                    alt={project.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeClasses[project.category as Exclude<ProjectCategory, "All">]}`}
                     >
-                      {project.linkLabel || "Live Demo"}
-                    </a>
-                  ) : (
-                    <Link href={`/projects/${project.slug}#system-flow`}>
-                      <span className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer">
-                        {project.linkLabel || "View System Flow"}
+                      {project.category}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5 sm:p-6 space-y-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2">
+                      {project.title}
+                    </h3>
+                    <p className="text-muted-foreground text-sm mb-2">
+                      {project.title === "AI-Powered Lead Intake & Qualification System" && "Best for: Agencies handling 20+ inbound leads/week"}
+                      {project.title === "Internal Ops Request Routing & Approvals" && "Best for: Operations teams managing multi-step approvals"}
+                      {project.title === "AI Support Assistant & Ticket Triage" && "Best for: SaaS teams with growing support volume"}
+                      {project.title === "Automated Reporting & Executive Dashboards" && "Best for: Leaders needing weekly performance visibility"}
+                      {project.title === "Client Intake & Onboarding Automation" && "Best for: Service businesses onboarding new clients weekly"}
+                      {project.title === "Revenue Ops CRM Sync & Enrichment Pipeline" && "Best for: Revenue teams tracking fast-moving pipelines"}
+                    </p>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>
+                        <span className="font-medium text-foreground">What was broken:</span>{" "}
+                        {project.title === "AI-Powered Lead Intake & Qualification System" && "Businesses lose leads and time due to manual follow-ups and unstructured inquiries."}
+                        {project.title === "Internal Ops Request Routing & Approvals" && "Teams lose time routing internal requests through email and spreadsheets."}
+                        {project.title === "AI Support Assistant & Ticket Triage" && "Support teams drown in repetitive questions and slow response times."}
+                        {project.title === "Automated Reporting & Executive Dashboards" && "Reporting takes days because data lives in siloed tools."}
+                        {project.title === "Client Intake & Onboarding Automation" && "New clients slip through the cracks without consistent onboarding."}
+                        {project.title === "Revenue Ops CRM Sync & Enrichment Pipeline" && "Revenue teams lose pipeline visibility when CRM data is incomplete or stale."}
+                      </p>
+                      <p>
+                        <span className="font-medium text-foreground">System built:</span>{" "}
+                        {project.title === "AI-Powered Lead Intake & Qualification System" && "Automatically captures and qualifies inbound leads, routes leads to the right workflow or response, reduces response time from hours to seconds."}
+                        {project.title === "Internal Ops Request Routing & Approvals" && "Centralizes requests into a single intake flow, auto-routes approvals based on rules and priority, creates clear status updates for every request."}
+                        {project.title === "AI Support Assistant & Ticket Triage" && "Drafts instant answers from a knowledge base, escalates complex tickets to humans, keeps CRM and ticket status in sync."}
+                        {project.title === "Automated Reporting & Executive Dashboards" && "Syncs data from spreadsheets and apps nightly, creates dashboards and alerts automatically, delivers weekly summaries to stakeholders."}
+                        {project.title === "Client Intake & Onboarding Automation" && "Collects intake data and required documents, creates tasks and timelines automatically, triggers onboarding emails and updates."}
+                        {project.title === "Revenue Ops CRM Sync & Enrichment Pipeline" && "Enriches inbound leads with firmographic data, keeps CRM stages and owners accurate automatically, triggers alerts for stalled or high-value deals."}
+                      </p>
+                      <p>
+                        <span className="font-medium text-foreground">Outcome:</span>{" "}
+                        {project.title === "AI-Powered Lead Intake & Qualification System" && "Faster response times, higher lead conversion."}
+                        {project.title === "Internal Ops Request Routing & Approvals" && "Less email back-and-forth, faster internal delivery."}
+                        {project.title === "AI Support Assistant & Ticket Triage" && "Faster first response, lighter support load."}
+                        {project.title === "Automated Reporting & Executive Dashboards" && "Always-on reporting without manual exports."}
+                        {project.title === "Client Intake & Onboarding Automation" && "Smoother onboarding, fewer dropped handoffs."}
+                        {project.title === "Revenue Ops CRM Sync & Enrichment Pipeline" && "Cleaner CRM data, faster pipeline decisions."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 border-l-4 border-l-primary">
+                    <p className="text-sm text-primary">
+                      <span className="font-semibold">Category:</span> {project.category}
+                    </p>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground opacity-75">
+                    {project.technologies.join(" · ")}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Link href={`/projects/${projectSlug}`}>
+                      <span className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
+                        View Case Study
                       </span>
                     </Link>
-                  )}
+                    {project.link ? (
+                      <a
+                        href={project.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all"
+                      >
+                        Live Demo
+                      </a>
+                    ) : (
+                      <Link href={`/projects/${projectSlug}#system-flow`}>
+                        <span className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer">
+                          View System Flow
+                        </span>
+                      </Link>
+                    )}
                 </div>
 
                 {project.github ? (
@@ -213,33 +306,154 @@ const Projects = () => {
                 ) : null}
               </div>
             </motion.div>
-          ))}
+          );
+          })}
         </div>
 
-        <section id="use-cases" className="mt-16 sm:mt-20">
+        <section id="automation-patterns" className="mt-16 sm:mt-20">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
               Automation Patterns I Build for Clients
             </h2>
             <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto">
-              These are repeatable systems I deploy to remove manual work and keep operations moving.
+              These are proven, repeatable automation systems I deploy to remove manual work and keep businesses running smoothly.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {patterns.map((pattern) => (
-              <a
-                key={pattern.title}
-                href={`#project-${pattern.slug}`}
-                className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-foreground font-semibold">{pattern.title}</h3>
-                  <span className="text-primary text-sm">View</span>
+            {patterns.map((pattern) => {
+              const isActive = activeUseCase === pattern.slug;
+              return (
+                <div
+                  key={pattern.title}
+                  onClick={() => {
+                    setActiveUseCase(pattern.slug);
+                    setTimeout(() => {
+                      const element = document.getElementById("use-case-details");
+                      if (element) {
+                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }, 100);
+                  }}
+                  className={`bg-card border rounded-xl p-5 transition-all cursor-pointer ${
+                    isActive
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className={`font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
+                      {pattern.title}
+                    </h3>
+                    <span className={`text-sm ${isActive ? "text-primary font-semibold" : "text-primary"}`}>
+                      View
+                    </span>
+                  </div>
                 </div>
-              </a>
-            ))}
+              );
+            })}
           </div>
+
+          {activeUseCase && (
+            <motion.div
+              id="use-case-details"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="mt-12 bg-card border border-border rounded-2xl p-6 sm:p-8"
+            >
+              {(() => {
+                const useCase = useCases.find(uc => uc.slug === activeUseCase);
+                if (!useCase) return null;
+
+                return (
+                  <>
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                          {useCase.category}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+                        {useCase.title}
+                      </h3>
+                      <p className="text-muted-foreground text-lg">
+                        {useCase.oneSentence}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                      <div>
+                        <h4 className="text-lg font-semibold text-foreground mb-3">Problem</h4>
+                        <p className="text-muted-foreground">{useCase.problem}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-foreground mb-3">System Built</h4>
+                        <p className="text-muted-foreground">{useCase.systemBuilt}</p>
+                      </div>
+                    </div>
+
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-foreground mb-3">Outcome</h4>
+                      <p className="text-muted-foreground">{useCase.outcome}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
+                          Tools
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {useCase.tools.map((tool) => (
+                            <span
+                              key={tool}
+                              className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm"
+                            >
+                              {tool}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
+                          Integrations
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {useCase.integrations.map((integration) => (
+                            <span
+                              key={integration}
+                              className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm"
+                            >
+                              {integration}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Link href="/contact">
+                        <span className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-all cursor-pointer">
+                          Book Automation ROI Audit
+                        </span>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setActiveUseCase(null);
+                          setTimeout(() => {
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }, 100);
+                        }}
+                        className="inline-flex items-center justify-center px-6 py-3 bg-card border border-primary text-primary rounded-xl font-semibold hover:bg-primary hover:text-white transition-all"
+                      >
+                        View Case Studies
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          )}
         </section>
 
         <section className="mt-16 sm:mt-20">
@@ -254,7 +468,7 @@ const Projects = () => {
               </p>
               <Link href="/contact">
                 <span className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all cursor-pointer">
-                  Book Free 45-minute Strategy Call
+                  Book a Free Automation ROI Audit
                 </span>
               </Link>
               <p className="text-sm opacity-90 mt-4">

@@ -16,10 +16,10 @@ const TestimonialsSlider = () => {
   return (
     <div className="relative w-full max-w-4xl mx-auto py-12">
       <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4 text-center">
-        Early Results & Founder Feedback
+        Early Founder Collaborations
       </h2>
       <p className="text-xs text-muted-foreground text-center mb-8">
-        Typical workflows automated: Lead intake • CRM sync • Follow-ups • Reporting • Internal ops • AI assistants
+        Operational wins through workflow simplification and systems thinking
       </p>
       
       <div className="relative h-[300px] overflow-hidden">

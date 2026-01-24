@@ -80,26 +80,70 @@ export const BIO = {
 // ================================
 export const PROJECTS = [
   {
-    title: "AI-Enhanced Portfolio Platform",
+    title: "AI-Powered Lead Intake & Qualification System",
     description:
-      "A full-stack portfolio with an embedded AI assistant, automated contact workflows, and lead qualification logic.",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop",
-    category: "AI Automation",
-    categoryColor: "purple",
-    technologies: ["React", "TypeScript", "OpenAI", "Node.js", "n8n"],
+      "Businesses lose leads and time due to manual follow-ups and unstructured inquiries. Automatically captures and qualifies inbound leads, routes leads to the right workflow or response, and reduces response time from hours to seconds.",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop",
+    category: "Lead Automation",
+    categoryColor: "primary",
+    technologies: ["n8n", "OpenAI", "Supabase", "React", "Node.js"],
     link: "https://jeffery-addae-portfolio-web.vercel.app/",
     github: "https://github.com/JefferyAddaeSecB",
   },
   {
-    title: "Business Automation Backend",
+    title: "Internal Ops Request Routing & Approvals",
     description:
-      "Server-side system handling form submissions, email automation, and structured lead routing.",
+      "Teams lose time routing internal requests through email and spreadsheets. Centralizes requests into a single intake flow, auto-routes approvals based on rules and priority, and creates clear status updates for every request.",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop",
+    category: "Internal Ops",
+    categoryColor: "sky",
+    technologies: ["n8n", "Notion", "Slack", "PostgreSQL", "Node.js"],
+    link: "https://example.com/internal-ops-demo",
+    github: "https://github.com/JefferyAddaeSecB/internal-ops-system",
+  },
+  {
+    title: "AI Support Assistant & Ticket Triage",
+    description:
+      "Support teams drown in repetitive questions and slow response times. Drafts instant answers from a knowledge base, escalates complex tickets to humans, and keeps CRM and ticket status in sync.",
     image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop",
-    category: "Systems",
-    categoryColor: "blue",
-    technologies: ["Node.js", "Supabase", "PostgreSQL", "SMTP"],
-    link: "https://cemar-counseling-main-zip.vercel.app",
-    github: "https://github.com/JefferyAddaeSecB/Cemar-Counseling-Main-Zip",
+    category: "AI Assistant",
+    categoryColor: "violet",
+    technologies: ["OpenAI", "n8n", "Zendesk", "Supabase"],
+    link: null,
+    github: "https://github.com/JefferyAddaeSecB/ai-support-assistant",
+  },
+  {
+    title: "Automated Reporting & Executive Dashboards",
+    description:
+      "Reporting takes days because data lives in siloed tools. Syncs data from spreadsheets and apps nightly, creates dashboards and alerts automatically, and delivers weekly summaries to stakeholders.",
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop",
+    category: "Backend Automation",
+    categoryColor: "amber",
+    technologies: ["n8n", "PostgreSQL", "Metabase", "Node.js"],
+    link: null,
+    github: "https://github.com/JefferyAddaeSecB/automated-reporting",
+  },
+  {
+    title: "Client Intake & Onboarding Automation",
+    description:
+      "New clients slip through the cracks without consistent onboarding. Collects intake data and required documents, creates tasks and timelines automatically, and triggers onboarding emails and updates.",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop",
+    category: "Client Intake System",
+    categoryColor: "rose",
+    technologies: ["n8n", "Google Workspace", "Notion", "Slack"],
+    link: null,
+    github: "https://github.com/JefferyAddaeSecB/client-intake-automation",
+  },
+  {
+    title: "Revenue Ops CRM Sync & Enrichment Pipeline",
+    description:
+      "Revenue teams lose pipeline visibility when CRM data is incomplete or stale. Enriches inbound leads with firmographic data, keeps CRM stages and owners accurate automatically, and triggers alerts for stalled or high-value deals.",
+    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop",
+    category: "Revenue Ops",
+    categoryColor: "emerald",
+    technologies: ["n8n", "HubSpot", "Clearbit", "Slack", "PostgreSQL"],
+    link: null,
+    github: "https://github.com/JefferyAddaeSecB/revenue-ops-crm",
   },
 ];
 
