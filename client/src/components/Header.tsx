@@ -15,16 +15,13 @@ const Header = () => {
 
   const navItems = [
     { path: "/", label: "Home" },
-    { path: "/projects", label: "Proof" },
+    { path: "/projects", label: "Case Studies" },
+    { path: "/how-it-works", label: "How It Works" },
     { path: "/about", label: "About" },
-    { path: "/cv", label: "CV" },
     { path: "/contact", label: "Contact" },
   ];
 
   const isActive = (path: string) => location === path;
-
-  const auditMailto =
-    "mailto:jeffaddai40@gmail.com?subject=Free%20ROI%20Automation%20Audit&body=Hi%20Jeffery%2C%0A%0AI%20want%20a%20quick%20ROI%20audit.%20Here%E2%80%99s%20what%20we%20do%20manually%3A%0A1)%20...%0A2)%20...%0A%0ATools%20we%20use%3A%20(Gmail%2C%20Sheets%2C%20HubSpot%2C%20etc.)%0A%0AWhere%20we%20lose%20time%2Fmoney%3A%20...%0A%0AThanks!";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -85,12 +82,15 @@ const Header = () => {
           <div className="flex items-center gap-3">
             {/* Desktop CTAs */}
             <div className="hidden md:flex items-center gap-3">
-              <a
-                href={auditMailto}
-                className="px-4 py-2 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all"
-              >
-                Get ROI Audit
-              </a>
+              <Link href="/contact">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all"
+                >
+                  Get ROI Audit
+                </motion.button>
+              </Link>
               <Link href="/contact">
                 <motion.button
                   whileHover={{ scale: 1.03 }}
@@ -144,12 +144,11 @@ const Header = () => {
 
                 {/* Mobile CTAs */}
                 <div className="px-4 pt-2 flex flex-col gap-2">
-                  <a
-                    href={auditMailto}
-                    className="w-full text-center px-4 py-3 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all"
-                  >
-                    Get ROI Audit
-                  </a>
+                  <Link href="/contact">
+                    <span className="w-full text-center block px-4 py-3 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all">
+                      Get ROI Audit
+                    </span>
+                  </Link>
                   <Link href="/contact">
                     <span className="w-full text-center block px-4 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all">
                       Book a Call

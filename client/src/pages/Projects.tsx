@@ -63,7 +63,7 @@ const Projects = () => {
           className="text-center mb-12 sm:mb-16"
         >
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Real Automation Systems That Save Time & Scale Businesses
+            Case Studies: Automation Systems That Save Time & Scale
           </h1>
           <p className="text-muted-foreground text-base sm:text-lg max-w-3xl mx-auto">
             These are production-ready systems I’ve built to automate lead intake, internal operations, reporting, and
@@ -77,13 +77,13 @@ const Projects = () => {
               href="/contact"
               className="px-6 py-3 rounded-xl bg-primary text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              Book a Free 45-minute Strategy Call
+              Get ROI Audit
             </a>
             <a
               href="#use-cases"
               className="px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all duration-300"
             >
-              View Automation Use Cases
+              View Use Cases
             </a>
           </div>
         </motion.div>

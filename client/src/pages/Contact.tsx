@@ -58,7 +58,7 @@ const Contact = () => {
         className="text-center mb-12"
       >
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary mb-4">
-          Book Your Free 45-Minute Strategy Call
+          Automation ROI Audit (45 Minutes, Free)
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
           Pick a time that works for you. I'll walk you through where automation can save time, reduce cost, and unlock scale in your business.

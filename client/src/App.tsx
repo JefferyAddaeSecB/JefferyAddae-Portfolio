@@ -16,6 +16,7 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectCaseStudy = lazy(() => import("@/pages/ProjectCaseStudy"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const CV = lazy(() => import("@/pages/CV"));
+const HowItWorks = lazy(() => import("@/pages/HowItWorks"));
 const Experience = lazy(() => import("@/pages/Experience"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CursorPatternBackground = lazy(() => import("@/components/CursorPatternBackground"));
@@ -76,6 +77,7 @@ function Router() {
             <Route path="/skills" component={Skills} />
             <Route path="/projects" component={Projects} />
             <Route path="/projects/:slug" component={ProjectCaseStudy} />
+            <Route path="/how-it-works" component={HowItWorks} />
             <Route path="/experience" component={Experience} />
             <Route path="/contact" component={Contact} />
             <Route path="/cv" component={CV} />

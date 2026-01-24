@@ -56,13 +56,10 @@ const About: React.FC = () => {
           </h2>
 
           <p className="text-muted-foreground text-sm sm:text-base">
-            I work with growing businesses that are stuck doing repetitive manual work — lead intake, follow-ups,
-            reporting, and internal operations — and turn those processes into automated systems that run quietly in
-            the background.
+            I run a focused automation practice where I personally design and ship systems. I work with growing service businesses and SaaS teams that are stuck doing repetitive manual work — lead intake, follow-ups, reporting, and internal operations. My job is to turn those processes into automated systems that run quietly in the background.
           </p>
           <p className="text-muted-foreground text-sm sm:text-base">
-            My focus isn’t automation for automation’s sake. It’s building reliable systems that actually save time,
-            reduce operational drag, and deliver measurable ROI.
+            I'm not interested in automation for automation's sake. I build reliable systems that actually save time, reduce operational drag, and deliver measurable ROI.
           </p>
 
           {/* What you do (ROI) */}

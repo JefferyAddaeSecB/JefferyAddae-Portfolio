@@ -47,9 +47,7 @@ const Footer = () => {
             </div>
 
             <p className="text-muted-foreground">
-              I design and build AI-powered workflows, automation systems,
-              and modern web applications that help businesses operate faster
-              and more efficiently.
+              AI automation systems for service businesses & SaaS teams. I design workflows that remove manual work and scale without hiring.
             </p>
           </div>
 
@@ -64,24 +62,29 @@ const Footer = () => {
                   Home
                 </span>
               </Link>
+              <Link href="/projects">
+                <span className="text-muted-foreground hover:text-primary cursor-pointer">
+                  Case Studies
+                </span>
+              </Link>
+              <Link href="/how-it-works">
+                <span className="text-muted-foreground hover:text-primary cursor-pointer">
+                  How It Works
+                </span>
+              </Link>
               <Link href="/about">
                 <span className="text-muted-foreground hover:text-primary cursor-pointer">
                   About
                 </span>
               </Link>
-              <Link href="/projects">
-                <span className="text-muted-foreground hover:text-primary cursor-pointer">
-                  Projects
-                </span>
-              </Link>
-              <Link href="/experience">
-                <span className="text-muted-foreground hover:text-primary cursor-pointer">
-                  Experience
-                </span>
-              </Link>
               <Link href="/contact">
                 <span className="text-muted-foreground hover:text-primary cursor-pointer">
                   Contact
+                </span>
+              </Link>
+              <Link href="/cv">
+                <span className="text-muted-foreground hover:text-primary cursor-pointer">
+                  Background
                 </span>
               </Link>
             </nav>

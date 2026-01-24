@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
-import { FRONTEND_SKILLS, BACKEND_SKILLS, CLOUD_INTEGRATION_SKILLS, TOOLS } from "@/lib/constants";
+import { CORE_SKILLS, TOOLS } from "@/lib/constants";
 
 interface SkillBarProps {
   name: string;
@@ -46,64 +46,67 @@ const Skills = () => {
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-16">
-        <div>
-          <motion.h2 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-3xl font-bold text-foreground mb-8"
           >
-            Frontend Development
-          </motion.h2>
-          
-          {FRONTEND_SKILLS.map((skill, index) => (
-            <SkillBar 
-              key={skill.name}
-              name={skill.name}
-              percentage={skill.percentage}
-              delay={index + 2}
-            />
-          ))}
-        </div>
-        
-        <div>
-          <motion.h2 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-3xl font-bold text-foreground mb-8"
-          >
-            Backend Development
-          </motion.h2>
-          
-          {BACKEND_SKILLS.map((skill, index) => (
-            <SkillBar 
-              key={skill.name}
-              name={skill.name}
-              percentage={skill.percentage}
-              delay={index + 2}
-            />
-          ))}
-        </div>
+            <motion.h2 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-3xl font-bold text-foreground mb-8"
+            >
+              Core Expertise
+            </motion.h2>
+            
+            {CORE_SKILLS.map((skill, index) => (
+              <SkillBar 
+                key={skill.name}
+                name={skill.name}
+                percentage={skill.percentage}
+                delay={index + 2}
+              />
+            ))}
+          </motion.div>
 
-        <div>
-          <motion.h2 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-3xl font-bold text-foreground mb-8"
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Cloud & Database Integration
-          </motion.h2>
-          
-          {CLOUD_INTEGRATION_SKILLS.map((skill, index) => (
-            <SkillBar 
-              key={skill.name}
-              name={skill.name}
-              percentage={skill.percentage}
-              delay={index + 2}
-            />
-          ))}
+            <motion.h2 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-3xl font-bold text-foreground mb-8"
+            >
+              Tech Stack
+            </motion.h2>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {TOOLS.map((tool, index) => (
+                <motion.div
+                  key={tool.name}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 * index }}
+                  className="bg-card/50 rounded-lg p-4 flex items-center gap-3 border border-border hover:border-primary/50 transition-colors"
+                >
+                  <img 
+                    src={tool.icon} 
+                    alt={tool.name}
+                    className="w-8 h-8 object-contain"
+                  />
+                  <div>
+                    <h3 className="text-foreground font-medium text-sm">{tool.name}</h3>
+                    <div className="text-xs text-muted-foreground">{tool.percentage}%</div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </div>
 
@@ -111,36 +114,6 @@ const Skills = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="mb-16"
-      >
-        <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Tools & Technologies</h2>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-          {TOOLS.map((tool, index) => (
-            <motion.div
-              key={tool.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 * index }}
-              className="bg-card hover:bg-card/80 rounded-lg p-6 text-center transition-colors flex flex-col items-center justify-center h-32"
-            >
-              <div className="mb-3">
-                <img 
-                  src={tool.icon} 
-                  alt={tool.name}
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-              <h3 className="text-foreground font-medium">{tool.name}</h3>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
         className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16"
       >
         <div className="bg-card rounded-lg p-8">

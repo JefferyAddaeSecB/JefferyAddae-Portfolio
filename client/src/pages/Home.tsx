@@ -39,8 +39,7 @@ const Home = () => {
               </h1>
 
               <p className="text-lg text-muted-foreground mb-2 max-w-xl mx-auto lg:mx-0">
-                I build n8n + AI workflows that remove manual work from
-                lead intake, follow-ups, reporting, and internal ops.
+                I build n8n + AI workflows that remove manual work from lead intake, follow-ups, reporting, and internal ops. Built for service businesses and SaaS teams that want to scale without hiring.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 mb-6 justify-center lg:justify-start">
@@ -62,7 +61,7 @@ const Home = () => {
                     whileTap={{ scale: 0.95 }}
                     className="px-8 py-4 bg-primary text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    Book Free 45-minute Strategy Call
+                    Get ROI Audit
                   </motion.button>
                 </Link>
                 <Link href="/projects">
@@ -71,7 +70,7 @@ const Home = () => {
                     whileTap={{ scale: 0.95 }}
                     className="px-8 py-4 bg-card border-2 border-primary text-primary rounded-xl font-semibold hover:bg-primary hover:text-white transition-all duration-300"
                   >
-                    See Proof
+                    See Case Studies
                   </motion.button>
                 </Link>
               </div>
