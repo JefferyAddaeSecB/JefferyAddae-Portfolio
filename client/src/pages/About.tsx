@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { CORE_SKILLS } from "@/lib/constants";
+import { BIO, CORE_SKILLS } from "@/lib/constants";
 
 const TestimonialsSlider = lazy(() => import("@/components/TestimonialsSlider"));
 
@@ -113,14 +113,10 @@ const About: React.FC = () => {
             </div>
           </div>
 
-          {/* My Approach (keep your BIO.philosophy) */}
+          {/* My Approach */}
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-foreground">How I Work</h3>
-            {[
-              "Automate before hiring",
-              "Monitor everything, always",
-              "Iterate from real data, not assumptions",
-            ].map((item, index) => (
+            {BIO.philosophy.map((item, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="mt-1 flex-shrink-0">
                   <svg
