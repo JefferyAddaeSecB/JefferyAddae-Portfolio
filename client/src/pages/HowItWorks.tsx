@@ -114,7 +114,7 @@ const HowItWorks: React.FC = () => {
           className="text-center mb-16 sm:mb-20"
         >
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            How I Build Automation That Actually Sticks
+            How I Build <span className="text-primary">Automation</span> That Actually Sticks
           </h1>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-8">
             From audit to deployment, a proven process that turns manual work into scalable systems.
@@ -321,7 +321,7 @@ const HowItWorks: React.FC = () => {
             Start with a free Automation ROI Audit. No commitment, no sales pitch—just a clear picture of what's possible.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/contact">
+            <Link href="/contact?tab=booking">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}

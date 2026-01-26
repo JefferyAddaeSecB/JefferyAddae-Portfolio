@@ -16,10 +16,10 @@ const TestimonialsSlider = () => {
   return (
     <div className="relative w-full max-w-4xl mx-auto py-12">
       <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4 text-center">
-        Early Founder Collaborations
+        How Systems Changed Teams
       </h2>
       <p className="text-xs text-muted-foreground text-center mb-8">
-        Operational wins through workflow simplification and systems thinking
+        From chaos to reliable, observable operations
       </p>
       
       <div className="relative h-[300px] overflow-hidden">

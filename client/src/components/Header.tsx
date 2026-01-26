@@ -86,15 +86,6 @@ const Header = () => {
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
-                  className="px-4 py-2 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all"
-                >
-                  Get ROI Audit
-                </motion.button>
-              </Link>
-              <Link href="/contact">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
                   className="px-4 py-2 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all shadow-sm"
                 >
                   Book a Call

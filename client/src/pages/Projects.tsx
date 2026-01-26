@@ -137,35 +137,55 @@ const Projects = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background py-20 px-4 sm:px-6">
-      <div className="container mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12 sm:mb-16"
-        >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Case Studies: Automation Systems That Save Time & Scale
+    <div className="relative min-h-screen bg-background">
+      {/* Background Effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="bg-gradient-1 absolute w-[600px] h-[600px] top-0 right-0 opacity-10"></div>
+        <div className="bg-gradient-2 absolute w-[500px] h-[500px] bottom-0 left-0 opacity-10"></div>
+      </div>
+
+      {/* Hero Section */}
+      <section className="flex items-center justify-center relative z-10 px-4 sm:px-6 py-16 sm:py-20">
+        <div className="container mx-auto max-w-6xl">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-4 leading-tight">
+            <span className="text-primary">Automation</span> Systems That Save{" "}
+            <span className="text-primary">Time</span> &{" "}
+            <span className="text-primary">Scale</span>
           </h1>
-          <p className="text-muted-foreground text-base sm:text-lg max-w-3xl mx-auto">
-            These are real automation systems I've built to eliminate manual work across lead intake, internal ops, reporting, and follow-ups — the same repeatable patterns I deploy for client businesses.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
-            <a
-              href="/contact"
-              className="px-6 py-3 rounded-xl bg-primary text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Book Automation ROI Audit
-            </a>
-            <a
-              href="#automation-patterns"
-              className="px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all duration-300"
-            >
-              View Use Cases
-            </a>
-          </div>
-        </motion.div>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-3xl mx-auto">
+              Real automation systems built to eliminate manual work across lead intake, internal ops, reporting, and follow-ups — the same repeatable patterns I deploy for client businesses.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
+              <Link href="/contact?tab=booking">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-primary text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  Book Automation ROI Audit
+                </motion.button>
+              </Link>
+              <Link href="#automation-patterns">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-card border-2 border-primary text-primary rounded-xl font-semibold hover:bg-primary hover:text-white transition-all duration-300"
+                >
+                  View Use Cases
+                </motion.button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="container mx-auto px-4 sm:px-6 pb-20 relative z-10">
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -272,7 +292,7 @@ const Projects = () => {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Link href={`/projects/${projectSlug}`}>
                       <span className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
-                        View Case Study
+                        View System
                       </span>
                     </Link>
                     {project.link ? (
@@ -432,7 +452,7 @@ const Projects = () => {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <Link href="/contact">
+                      <Link href="/contact?tab=booking">
                         <span className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-all cursor-pointer">
                           Book Automation ROI Audit
                         </span>
@@ -446,7 +466,7 @@ const Projects = () => {
                         }}
                         className="inline-flex items-center justify-center px-6 py-3 bg-card border border-primary text-primary rounded-xl font-semibold hover:bg-primary hover:text-white transition-all"
                       >
-                        View Case Studies
+                        Back to Systems
                       </button>
                     </div>
                   </>
@@ -466,7 +486,7 @@ const Projects = () => {
               <p className="text-lg md:text-xl mb-8 opacity-95 max-w-3xl mx-auto">
                 I’ll identify one high-friction workflow and show you exactly how to automate it — no obligation.
               </p>
-              <Link href="/contact">
+              <Link href="/contact?tab=booking">
                 <span className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all cursor-pointer">
                   Book a Free Automation ROI Audit
                 </span>

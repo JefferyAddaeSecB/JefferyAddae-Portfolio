@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { CORE_SKILLS, BIO } from "@/lib/constants";
+import { CORE_SKILLS } from "@/lib/constants";
 
 const TestimonialsSlider = lazy(() => import("@/components/TestimonialsSlider"));
 
@@ -19,11 +19,12 @@ const About: React.FC = () => {
         transition={{ duration: 0.5 }}
         className="text-center mb-12 sm:mb-16 relative z-10"
       >
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary mb-4">
-          Built to Eliminate Manual Work — Not Add More Software
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
+          <span className="text-primary">Automation</span> That Fails Is Worse
+          Than No <span className="text-primary">Automation</span>
         </h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          Most businesses have workflow problems, not tool problems. I eliminate manual handoffs, silent failures, and disconnected systems that slow teams down.
+        <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
+          I build production systems with observability, recovery, and ownership clarity.
         </p>
       </motion.div>
 
@@ -51,25 +52,45 @@ const About: React.FC = () => {
           className="space-y-6"
         >
           <h2 className="text-2xl sm:text-2xl font-bold text-foreground">
-            AI Automation Specialist & Full-Stack Engineer
+            Your Automation Doesn't Run Itself
           </h2>
 
           <p className="text-muted-foreground text-sm sm:text-base">
-            I believe automation must be observable, recoverable, and documented. Every system I build includes error handling, retries, alerts, and runbooks for handoff.
+            I own the production lifecycle: error handling, monitoring, alerts, recovery logic, and documentation. Systems run reliably because they're built to fail safely and recover automatically.
           </p>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            This founder-led approach disqualifies low-budget clients seeking quick hacks. I focus on production-grade systems that scale and maintain themselves.
+
+          <p className="text-muted-foreground text-xs sm:text-sm">
+            Weekly check-ins. Real data iteration. You don't maintain alone.
           </p>
+
+          {/* WHO THIS IS FOR / NOT FOR */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-card/50 p-3 sm:p-4 rounded-lg border border-green-500/20">
+              <h4 className="text-sm font-bold text-foreground mb-2">Right fit:</h4>
+              <ul className="space-y-1 text-xs sm:text-sm text-muted-foreground">
+                <li>• Been burned by fragile automation</li>
+                <li>• Uptime matters to revenue</li>
+                <li>• Need reliable ownership</li>
+              </ul>
+            </div>
+            <div className="bg-card/50 p-3 sm:p-4 rounded-lg border border-red-500/20">
+              <h4 className="text-sm font-bold text-foreground mb-2">Not right fit:</h4>
+              <ul className="space-y-1 text-xs sm:text-sm text-muted-foreground">
+                <li>• Looking for cheap/quick</li>
+                <li>• Want "set it and forget it"</li>
+                <li>• Can't invest in reliability</li>
+              </ul>
+            </div>
+          </div>
 
           {/* What you do (ROI) */}
           <div className="bg-card/50 p-4 sm:p-6 rounded-lg border border-border">
-            <h3 className="text-lg font-bold text-foreground mb-3">What I help businesses do</h3>
+            <h3 className="text-lg font-bold text-foreground mb-3">What You Get</h3>
             <div className="space-y-3">
               {[
-                "Replace manual lead chasing with instant qualification and routing",
-                "Reduce support tickets by 60% through AI-powered responses",
-                "Scale operations from 10 to 100 customers without adding staff",
-                "Cut reporting time from days to automated dashboards",
+                "Stop losing leads to silent failures",
+                "Full visibility into what's running",
+                "Scale without proportional hiring or chaos",
               ].map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <div className="mt-1 flex-shrink-0">
@@ -94,11 +115,11 @@ const About: React.FC = () => {
 
           {/* My Approach (keep your BIO.philosophy) */}
           <div className="space-y-3">
-            <h3 className="text-lg font-bold text-foreground">My Approach</h3>
+            <h3 className="text-lg font-bold text-foreground">How I Work</h3>
             {[
               "Automate before hiring",
-              "Remove bottlenecks instead of hiding them",
-              "Ship fast, monitor aggressively, iterate based on usage"
+              "Monitor everything, always",
+              "Iterate from real data, not assumptions",
             ].map((item, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="mt-1 flex-shrink-0">
@@ -167,7 +188,7 @@ const About: React.FC = () => {
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <Link href="/contact">
+              <Link href="/contact?tab=booking">
                 <span className="px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer text-center">
                   Book a Free 45-minute Strategy Call
                 </span>
@@ -225,7 +246,7 @@ const About: React.FC = () => {
           {CORE_SKILLS.map((skill, index) => (
             <div
               key={index}
-              className="bg-card/50 p-4 sm:p-6 rounded-lg hover:shadow-lg hover:shadow-primary/10 transition-all duration-300"
+              className="bg-card/50 border border-primary/20 p-4 sm:p-6 rounded-lg hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300"
             >
               <div className="flex flex-col gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-foreground">

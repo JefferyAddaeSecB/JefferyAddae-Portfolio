@@ -38,8 +38,8 @@ const Home = () => {
                 <span className="text-primary">save hours</span> every week.
               </h1>
 
-              <p className="text-lg text-muted-foreground mb-2 max-w-xl mx-auto lg:mx-0">
-                I design and deploy production-ready AI automation systems using n8n that eliminate manual work across lead intake, follow-ups, reporting, and internal operations — so service businesses and SaaS teams can scale without hiring.
+              <p className="text-base sm:text-lg text-muted-foreground mb-2 max-w-xl mx-auto lg:mx-0">
+                I design and deploy production-ready AI automation systems using n8n to eliminate manual work across lead intake, follow-ups, reporting, and internal ops — so service businesses and agencies scale without hiring.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 mb-6 justify-center lg:justify-start">
@@ -55,13 +55,13 @@ const Home = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-                <Link href="/contact">
+                <Link href="/contact?tab=booking">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="px-8 py-4 bg-primary text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    Automation ROI Audit
+                    Get a Free Automation ROI Audit
                   </motion.button>
                 </Link>
                 <Link href="/projects">
@@ -127,7 +127,7 @@ const Home = () => {
       </section>
 
       {/* Services Section */}
-      <section className="py-20 bg-muted/30 relative z-10">
+      <section className="py-16 sm:py-20 bg-muted/30 relative z-10">
         <div className="container mx-auto px-4 max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -140,7 +140,7 @@ const Home = () => {
               Automation Systems I <span className="text-primary">Build for Clients</span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Proven automation patterns that remove manual work and keep operations running without constant oversight.
+              Proven automation patterns that cut manual effort and keep operations running without constant oversight.
             </p>
           </motion.div>
 
@@ -198,7 +198,7 @@ const Home = () => {
 
       {/* Technologies Section */}
       {/* Technologies Section */}
-<section className="py-20 relative z-10">
+      <section className="py-16 sm:py-20 relative z-10">
   <div className="container mx-auto px-4 max-w-6xl">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -207,6 +207,9 @@ const Home = () => {
       transition={{ duration: 0.6 }}
       className="text-center mb-12"
     >
+      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
+        Production tools used in live client systems
+      </p>
       <h2 className="text-4xl md:text-5xl font-bold mb-4">
         Tools I Use to <span className="text-primary">Ship Results</span>
       </h2>
@@ -312,7 +315,7 @@ const Home = () => {
     </div>
 
     {/* Credibility strip */}
-    <div className="mt-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-muted/30 border border-border rounded-2xl p-6">
+    <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-primary/10 border border-primary/20 rounded-2xl p-6">
       <div>
         <p className="text-foreground font-semibold">
           Want a quick ROI win?
@@ -321,14 +324,14 @@ const Home = () => {
           I can automate one high-friction workflow first (lead intake, follow-ups, reporting, internal ops), then scale from there.
         </p>
       </div>
-      <div className="flex gap-3">
+      <div className="flex w-full flex-col sm:flex-row gap-3 sm:w-auto">
         <Link href="/projects">
-          <button className="px-5 py-2.5 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all">
+          <button className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-card border border-border hover:border-primary/50 text-foreground font-semibold transition-all">
             View Case Studies
           </button>
         </Link>
-        <Link href="/contact">
-          <button className="px-5 py-2.5 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all">
+        <Link href="/contact?tab=booking">
+          <button className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all">
             Book Free 45-minute Automation ROI Audit
           </button>
         </Link>

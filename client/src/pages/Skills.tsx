@@ -38,7 +38,9 @@ const Skills = () => {
         transition={{ duration: 0.5 }}
         className="text-center mb-16"
       >
-        <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">MY SKILLS</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+          My <span className="text-primary">Skills</span>
+        </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Specializing in full-stack development and AI automation systems with modern technologies like React, Next.js, Node.js, and cloud platforms.
           Below is a showcase of my technical proficiencies and tools I work with.

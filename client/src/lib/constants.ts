@@ -3,44 +3,29 @@
 // ================================
 export const CORE_SKILLS = [
   {
-    name: "AI Automation Systems",
-    description: "Business workflows automated using AI, APIs, and orchestration tools",
+    name: "Lead Automation",
+    description: "Capture, qualify, route. Never lose a lead again.",
     percentage: 92,
   },
   {
-    name: "Full-Stack Development",
-    description: "React, TypeScript, Node.js, modern scalable architectures",
-    percentage: 95,
-  },
-  {
-    name: "Workflow Orchestration",
-    description: "n8n-based automation, triggers, integrations, and agents",
-    percentage: 88,
-  },
-  {
-    name: "Cloud & Database Systems",
-    description: "Supabase, Firebase, PostgreSQL, authentication & storage",
+    name: "Observable Systems",
+    description: "Logging, monitoring, alerts, recovery. Built-in.",
     percentage: 90,
   },
   {
-    name: "API Design & Integrations",
-    description: "REST APIs, third-party integrations, webhooks",
-    percentage: 93,
+    name: "Workflow Integration",
+    description: "n8n, APIs, custom code. Reliable, together.",
+    percentage: 90,
   },
   {
-    name: "UI/UX & Conversion Optimization",
-    description: "Interfaces designed to convert users into leads",
-    percentage: 87,
+    name: "Production Engineering",
+    description: "React, TypeScript, Node.js. Scales reliably.",
+    percentage: 95,
   },
   {
-    name: "Product & MVP Engineering",
-    description: "Building lean MVPs fast with scalability in mind",
-    percentage: 89,
-  },
-  {
-    name: "Systems Thinking",
-    description: "Designing architectures that scale and reduce human effort",
-    percentage: 91,
+    name: "AI Decision Making",
+    description: "OpenAI, LangChain. Learns from real data.",
+    percentage: 88,
   },
 ];
 
@@ -197,6 +182,38 @@ export const TESTIMONIALS = [
     title: "Early-stage Founder",
     avatar:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop",
+  },
+  {
+    quote:
+      "Leads were lost in email. Now they're routed instantly. System runs quiet.",
+    name: "Client Feedback",
+    title: "Service Business Owner",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop",
+  },
+  {
+    quote:
+      "Before: spreadsheets, no visibility. After: logged, monitored, clear.",
+    name: "Client Feedback",
+    title: "Ops Director",
+    avatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop",
+  },
+  {
+    quote:
+      "Requests scattered everywhere. Now captured, routed, tracked. No firefighting.",
+    name: "Client Feedback",
+    title: "SaaS Founder",
+    avatar:
+      "https://images.unsplash.com/photo-1507539066556-6812c9d1c72e?w=120&h=120&fit=crop",
+  },
+  {
+    quote:
+      "System owns the problem. We own the oversight. Alerts work. Runbooks exist.",
+    name: "Client Feedback",
+    title: "Operations Manager",
+    avatar:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop",
   },
 ];
 

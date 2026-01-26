@@ -7,22 +7,6 @@ const Footer = () => {
     <footer className="bg-card border-t border-border py-12">
       <div className="container mx-auto px-6">
 
-        {/* TOP CTA */}
-        <div className="mb-12 rounded-3xl border border-border bg-background/40 backdrop-blur p-8 md:p-10 text-center">
-          <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-            Ready to automate your business?
-          </h3>
-          <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
-            I help businesses remove manual work by building AI automation systems,
-            internal tools, and scalable web platforms that save time and increase ROI.
-          </p>
-          <Link href="/contact#form">
-            <span className="inline-block px-8 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
-              Let's Talk
-            </span>
-          </Link>
-        </div>
-
         {/* MAIN GRID */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
 
@@ -47,7 +31,7 @@ const Footer = () => {
             </div>
 
             <p className="text-muted-foreground">
-              AI automation systems for service businesses & SaaS teams. I design workflows that remove manual work and scale without hiring.
+              I build reliable AI automation systems for service businesses and SaaS teams — focused on real ROI, not hype.
             </p>
           </div>
 

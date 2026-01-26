@@ -28,7 +28,7 @@ const ProjectCaseStudy = () => {
                 Back to Projects
               </span>
             </Link>
-            <Link href="/contact">
+            <Link href="/contact?tab=booking">
               <span className="px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
                 Book Free 45-minute Automation ROI Audit
               </span>
@@ -40,7 +40,7 @@ const ProjectCaseStudy = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background py-20 px-4">
+    <div className="min-h-screen bg-background py-16 sm:py-20 px-4">
       <div className="container mx-auto max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -183,7 +183,7 @@ const ProjectCaseStudy = () => {
           </section>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <Link href="/contact">
+            <Link href="/contact?tab=booking">
               <span className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
                 Book a Free Automation ROI Audit
               </span>

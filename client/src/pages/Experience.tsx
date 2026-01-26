@@ -247,8 +247,9 @@ const Experience: React.FC = () => {
             Download Resume (PDF)
           </a>
         </div>
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary mb-4">
-          Proven Experience Building Scalable Automation & Software Systems
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
+          Proven Experience Building <span className="text-primary">Scalable Automation</span>{" "}
+          & <span className="text-primary">Software Systems</span>
         </h1>
         <p className="text-muted-foreground text-base md:text-lg max-w-3xl mx-auto">
           I’ve designed, built, and deployed production-ready systems for startups, agencies, and internal teams — focused on automation,
@@ -498,7 +499,7 @@ const Experience: React.FC = () => {
                           View Automation Projects
                         </span>
                       </Link>
-                      <Link href="/contact">
+                      <Link href="/contact?tab=booking">
                         <span className="px-5 py-2.5 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
                           Book Free 45-minute Strategy Call
                         </span>
@@ -554,7 +555,7 @@ const Experience: React.FC = () => {
             In 45 minutes, I’ll map your automation opportunities + next steps.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link href="/contact">
+            <Link href="/contact?tab=booking">
               <span className="px-6 py-3 rounded-xl bg-white text-primary font-semibold hover:opacity-90 transition-all cursor-pointer">
                 Book Free 45-minute Strategy Call
               </span>
@@ -574,7 +575,7 @@ const Experience: React.FC = () => {
         </div>
       </motion.div>
       <div className="hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-40">
-        <Link href="/contact">
+        <Link href="/contact?tab=booking">
           <span className="px-4 py-3 rounded-full bg-primary text-white font-semibold shadow-lg hover:shadow-xl transition-all cursor-pointer">
             Book Free 45-minute Strategy Call
           </span>
