@@ -20,11 +20,10 @@ const About: React.FC = () => {
         className="text-center mb-12 sm:mb-16 relative z-10"
       >
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
-          <span className="text-primary">Automation</span> That Fails Is Worse
-          Than No <span className="text-primary">Automation</span>
+          Engineering <span className="text-primary">Automation</span> the Right Way
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-          I build production systems with observability, recovery, and ownership clarity.
+          I design production systems with observability, recovery paths, and clear ownership so they run reliably.
         </p>
       </motion.div>
 

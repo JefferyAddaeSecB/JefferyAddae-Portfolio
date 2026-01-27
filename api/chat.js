@@ -11,10 +11,64 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message, conversationHistory = [] } = req.body || {};
+    const { message, conversationHistory = [], sessionId: rawSessionId, context: rawContext } = req.body || {};
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ message: 'Message is required' });
+    }
+
+    const sessionId = typeof rawSessionId === 'string' ? rawSessionId : undefined;
+    const context = rawContext && typeof rawContext === 'object' ? rawContext : {};
+    const safeHistory = Array.isArray(conversationHistory) ? conversationHistory : [];
+    const n8nChatWebhookUrl = process.env.N8N_CHAT_WEBHOOK_URL?.trim();
+
+    if (n8nChatWebhookUrl) {
+      try {
+        const n8nResponse = await fetch(n8nChatWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            sessionId,
+            context,
+            conversationHistory: safeHistory
+          })
+        });
+
+        const rawText = await n8nResponse.text();
+        if (!n8nResponse.ok) {
+          console.error('n8n chat webhook error:', n8nResponse.status, rawText);
+          return res.status(200).json({
+            response: fallbackPortfolioSummary,
+            sessionId: sessionId || Date.now().toString()
+          });
+        }
+
+        let data = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : null;
+        } catch (parseErr) {
+          data = null;
+        }
+
+        const reply = data?.message || data?.response || data?.reply || rawText || fallbackPortfolioSummary;
+        const returnedSessionId = typeof data?.sessionId === 'string'
+          ? data.sessionId
+          : sessionId || Date.now().toString();
+
+        return res.status(200).json({
+          response: reply,
+          sessionId: returnedSessionId,
+          intent: data?.intent,
+          suggestedAction: data?.suggestedAction
+        });
+      } catch (n8nError) {
+        console.error('Error calling n8n chat webhook:', n8nError);
+        return res.status(200).json({
+          response: fallbackPortfolioSummary,
+          sessionId: sessionId || Date.now().toString()
+        });
+      }
     }
 
     const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
@@ -54,8 +108,8 @@ Respond naturally and helpfully to questions about Jeffery's skills, projects, e
     const model = process.env.AI_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...(Array.isArray(conversationHistory)
-        ? conversationHistory.map((msg) => ({
+      ...(Array.isArray(safeHistory)
+        ? safeHistory.map((msg) => ({
             role: msg.role,
             content: msg.content
           }))

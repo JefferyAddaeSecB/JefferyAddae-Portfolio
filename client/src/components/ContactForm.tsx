@@ -284,11 +284,11 @@ const ContactForm = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="tools" className="text-sm font-medium">
+          <Label id="tools-label" className="text-sm font-medium">
             Tools involved
           </Label>
           <Select value={formData.tools} onValueChange={(value) => handleSelectChange("tools", value)}>
-            <SelectTrigger id="tools">
+            <SelectTrigger id="tools" aria-labelledby="tools-label">
               <SelectValue placeholder="Select tools" />
             </SelectTrigger>
             <SelectContent>
@@ -305,11 +305,11 @@ const ContactForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="urgency" className="text-sm font-medium">
+          <Label id="urgency-label" className="text-sm font-medium">
             How soon?
           </Label>
           <Select value={formData.urgency} onValueChange={(value) => handleSelectChange("urgency", value)}>
-            <SelectTrigger id="urgency">
+            <SelectTrigger id="urgency" aria-labelledby="urgency-label">
               <SelectValue placeholder="Select timeline" />
             </SelectTrigger>
             <SelectContent>

@@ -31,8 +31,11 @@ export function AIPortfolioAssistant() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  const chatEndpoint = `${apiBaseUrl}/api/chat`;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +45,18 @@ export function AIPortfolioAssistant() {
   }, [messages]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedSession = window.localStorage.getItem('chat_session_id');
+    if (storedSession) {
+      setSessionId(storedSession);
+      return;
+    }
+    const newSessionId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    window.localStorage.setItem('chat_session_id', newSessionId);
+    setSessionId(newSessionId);
+  }, []);
+
+  useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
@@ -49,7 +64,8 @@ export function AIPortfolioAssistant() {
 
   const handleSendMessage = async (messageText?: string) => {
     const userMessage = messageText || input.trim();
-    if ((!userMessage && attachments.length === 0) || loading) return;
+    const outboundMessage = userMessage || (attachments.length ? 'Sent attachments' : '');
+    if (!outboundMessage || loading) return;
 
     setInput('');
     
@@ -67,20 +83,28 @@ export function AIPortfolioAssistant() {
     setLoading(true);
 
     try {
-      // Build conversation history for context
-      const conversationHistory = messages
-        .slice(-6) // Last 3 exchanges (6 messages)
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
-
-      const response = await fetch('/api/chat', {
+      const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: userMessage,
-          conversationHistory 
+          sessionId,
+          message: outboundMessage,
+          conversationHistory: messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          context: typeof window !== 'undefined'
+            ? {
+                page: window.location.pathname,
+                referrer: document.referrer,
+                timestamp: new Date().toISOString(),
+                attachments: attachments.map((file) => ({
+                  name: file.name,
+                  type: file.type,
+                  size: file.size,
+                })),
+              }
+            : {}
         }),
       });
 
@@ -89,11 +113,18 @@ export function AIPortfolioAssistant() {
       }
 
       const data = await response.json();
+      const nextSessionId = data.sessionId || data.conversationId || data.session_id || sessionId || Date.now().toString();
+      if (nextSessionId) {
+        setSessionId(nextSessionId);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('chat_session_id', nextSessionId);
+        }
+      }
       
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response || data.reply || 'Sorry, I couldn\'t generate a response.',
+        content: data.response || data.message || data.reply || 'Sorry, I couldn\'t generate a response.',
         timestamp: new Date()
       };
 
@@ -130,6 +161,7 @@ export function AIPortfolioAssistant() {
         timestamp: new Date()
       }
     ]);
+    setSessionId(null);
   };
 
   const handleCopy = async (text: string, id: string) => {

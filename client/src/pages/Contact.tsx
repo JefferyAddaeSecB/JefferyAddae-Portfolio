@@ -74,7 +74,7 @@ const Contact = () => {
         transition={{ duration: 0.5 }}
         className="container mx-auto px-4 py-16 sm:py-20"
       >
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-3 leading-tight">
             Free 45-Minute <span className="text-primary">Automation</span>{" "}
@@ -151,7 +151,7 @@ const Contact = () => {
 
       {/* Main Content - Below the Fold */}
       <div className="container mx-auto px-4 py-16 sm:py-20">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Tab Navigation */}
           <div className="flex gap-2 mb-12 border-b border-border">
             <button
