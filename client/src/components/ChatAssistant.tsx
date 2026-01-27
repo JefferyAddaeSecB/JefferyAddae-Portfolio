@@ -22,7 +22,8 @@ const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL as string | undefined;
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+  const chatEndpoint = `${apiBaseUrl || ''}/api/chat`;
 
   useEffect(() => {
     const storedSessionId = window.localStorage.getItem("chat_session_id");
@@ -54,16 +55,16 @@ const ChatAssistant = () => {
     setIsLoading(true);
 
     try {
-      if (!webhookUrl) {
-        throw new Error("Missing VITE_N8N_CHAT_WEBHOOK_URL");
-      }
-
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
           message: currentInput,
+          conversationHistory: messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
           context: {
             page: window.location.pathname,
             referrer: document.referrer,
@@ -72,25 +73,27 @@ const ChatAssistant = () => {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = rawText || null;
       }
 
-      const data = await response.json();
-
-      if (!data?.success) {
+      const replyText = data?.message || data?.response || data?.reply;
+      if (replyText) {
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: replyText,
+          timestamp: new Date().toISOString(),
+          suggestedAction: data?.suggestedAction,
+          intent: data?.intent,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
         throw new Error(data?.error || "Failed to get response");
       }
-
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.message,
-        timestamp: data.timestamp || new Date().toISOString(),
-        suggestedAction: data.suggestedAction,
-        intent: data.intent,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => [
