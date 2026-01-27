@@ -18,6 +18,12 @@ export default {
   },
   // Prevent Vite from creating timestamp files that trigger watch restarts
   server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
     watch: {
       // Don't watch node_modules or dist
       ignored: ['**/node_modules/**', '**/dist/**']
