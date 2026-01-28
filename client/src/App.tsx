@@ -20,7 +20,6 @@ const HowItWorks = lazy(() => import("@/pages/HowItWorks"));
 const Experience = lazy(() => import("@/pages/Experience"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CursorPatternBackground = lazy(() => import("@/components/CursorPatternBackground"));
-const ChatAssistant = lazy(() => import("@/components/ChatAssistant"));
 
 // Reset scroll on every route change so navigation (incl. footer links) opens at the top
 const RouteScrollReset = () => {
@@ -97,9 +96,6 @@ function App() {
       </main>
       <Footer />
       <ScrollToTop />
-      <Suspense fallback={null}>
-        <ChatAssistant />
-      </Suspense>
       <Suspense fallback={null}>
         <CursorPatternBackground 
           color="#3b82f6"
