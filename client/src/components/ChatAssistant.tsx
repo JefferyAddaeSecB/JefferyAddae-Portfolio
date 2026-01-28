@@ -22,6 +22,7 @@ const ChatAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
+  const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL as string | undefined;
 
   useEffect(() => {
     const storedSessionId = window.localStorage.getItem("chat_session_id");
@@ -53,9 +54,7 @@ const ChatAssistant = () => {
     setIsLoading(true);
 
     try {
-      const chatEndpoint = `${apiBaseUrl}/api/chat`;
-      console.log("Sending to:", chatEndpoint);
-
+      const chatEndpoint = webhookUrl || `${apiBaseUrl}/api/chat`;
       const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -70,19 +69,25 @@ const ChatAssistant = () => {
         }),
       });
 
-      const data = await response.json();
-      console.log("Chat response:", data);
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
 
-      if (!data?.success) {
+      const replyText = data?.message || data?.response || data?.reply || rawText;
+      if (!replyText) {
         throw new Error(data?.error || "Failed to get response");
       }
 
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.message,
-        timestamp: data.timestamp || new Date().toISOString(),
-        suggestedAction: data.suggestedAction,
-        intent: data.intent,
+        content: replyText,
+        timestamp: data?.timestamp || new Date().toISOString(),
+        suggestedAction: data?.suggestedAction,
+        intent: data?.intent,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
