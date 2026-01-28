@@ -333,91 +333,61 @@ export async function registerRoutes(app: Express): Promise<void> {
    * 
    * Chat endpoint - proxies messages to n8n webhook
    * Request body: { sessionId, message, context }
-   * Response: { success, message, timestamp, suggestedAction, intent }
+   * Response: { success, message, ... }
    */
   app.post("/api/chat", async (req: Request, res: Response) => {
     try {
-      const { sessionId, message, context } = req.body;
+      const { message, sessionId, context } = req.body;
 
-      // Validate required fields
-      if (!message || typeof message !== "string" || message.trim().length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Message is required and must be a non-empty string"
-        });
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
       }
 
-      if (!sessionId || typeof sessionId !== "string") {
-        return res.status(400).json({
-          success: false,
-          error: "Session ID is required"
-        });
+      const n8nWebhookUrl = process.env.N8N_CHAT_WEBHOOK_URL;
+      if (!n8nWebhookUrl) {
+        console.error("N8N_CHAT_WEBHOOK_URL is not configured");
+        return res.status(500).json({ error: "Chat service is not configured" });
       }
 
-      // Get n8n webhook URL from environment
-      const webhookUrl = process.env.N8N_CHAT_WEBHOOK_URL;
-      if (!webhookUrl) {
-        console.error("❌ N8N_CHAT_WEBHOOK_URL not configured");
-        return res.status(500).json({
-          success: false,
-          error: "Chat service not configured"
-        });
-      }
-
-      console.log("🔗 Forwarding to n8n:", webhookUrl);
-      console.log("📤 Chat message:", { sessionId, message: message.substring(0, 50) + "..." });
-
-      // Forward request to n8n
-      const response = await fetch(webhookUrl, {
+      console.log("Forwarding chat request to n8n:", { sessionId, messageLength: message.length });
+      
+      // Forward to n8n
+      const n8nResponse = await fetch(n8nWebhookUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          message: message.trim(),
-          context: context || {}
-        })
+          message,
+          context,
+        }),
       });
 
-      console.log("📥 n8n response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ n8n error:", response.status, errorText);
-        return res.status(response.status).json({
+      const responseText = await n8nResponse.text();
+      
+      if (!n8nResponse.ok) {
+        console.error("n8n webhook error:", n8nResponse.status, responseText);
+        return res.status(200).json({
           success: false,
-          error: `n8n service error: ${response.status}`
+          error: "n8n service error",
+          message: "Sorry, I'm having trouble connecting. Please try again.",
         });
       }
 
-      // Parse n8n response
-      let data: any;
-      const contentType = response.headers.get("content-type");
-      
-      if (contentType?.includes("application/json")) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        data = { message: text, success: true };
+      let responseData: any = null;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : null;
+      } catch (e) {
+        responseData = { success: true, message: responseText };
       }
 
-      console.log("📥 n8n response data:", data);
-
-      // Return response to frontend
-      return res.status(200).json({
-        success: true,
-        message: data.message || data.text || "Response received from assistant",
-        timestamp: data.timestamp || new Date().toISOString(),
-        suggestedAction: data.suggestedAction,
-        intent: data.intent
-      });
-
+      console.log("n8n response received:", responseData);
+      return res.status(200).json({ success: true, ...responseData });
     } catch (error) {
-      console.error("❌ Chat endpoint error:", error);
-      return res.status(500).json({
+      console.error("Chat endpoint error:", error);
+      return res.status(200).json({
         success: false,
-        error: error instanceof Error ? error.message : "Internal server error"
+        error: error instanceof Error ? error.message : "Unknown error",
+        message: "Sorry, I'm having trouble connecting. Please try again.",
       });
     }
   });
