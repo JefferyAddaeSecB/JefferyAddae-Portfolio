@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm ci && npm --prefix client ci && npm --prefix client run build",
   "outputDirectory": "client/dist",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
