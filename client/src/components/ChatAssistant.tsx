@@ -187,16 +187,13 @@ export default function ChatAssistant() {
     setInput('');
     setIsLoading(true);
 
-    // ADD THIS LOGGING
-    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
-    console.log('🔗 Webhook URL:', webhookUrl);
     console.log('📤 Sending:', {
       sessionId,
       message: currentInput,
     });
 
     try {
-      const response = await fetch(webhookUrl, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,16 +272,13 @@ export default function ChatAssistant() {
     setInput('');
     setIsLoading(true);
 
-    // ADD THIS LOGGING
-    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
-    console.log('🔗 Webhook URL:', webhookUrl);
     console.log('📤 Sending:', {
       sessionId,
       message: text,
     });
 
     try {
-      const response = await fetch(webhookUrl, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
