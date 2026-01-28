@@ -83,13 +83,13 @@ const Home = () => {
               <div className="flex gap-8 justify-center lg:justify-start text-center">
                 <div>
                   <div className="text-3xl font-bold text-primary">
-                    <CountUp end={2} suffix="+" />
+                    <CountUp end={4} suffix="+" />
                   </div>
                   <div className="text-sm text-muted-foreground">Production Systems Shipped</div>
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-primary">
-                    <CountUp end={3} suffix="+" />
+                    <CountUp end={7} suffix="+" />
                   </div>
                   <div className="text-sm text-muted-foreground">Automation Systems Built</div>
                 </div>
