@@ -21,7 +21,7 @@ const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL as string | undefined;
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
 
   useEffect(() => {
     const storedSessionId = window.localStorage.getItem("chat_session_id");
@@ -53,11 +53,10 @@ const ChatAssistant = () => {
     setIsLoading(true);
 
     try {
-      if (!webhookUrl) {
-        throw new Error("Missing VITE_N8N_CHAT_WEBHOOK_URL");
-      }
+      const chatEndpoint = `${apiBaseUrl}/api/chat`;
+      console.log("Sending to:", chatEndpoint);
 
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,6 +71,7 @@ const ChatAssistant = () => {
       });
 
       const data = await response.json();
+      console.log("Chat response:", data);
 
       if (!data?.success) {
         throw new Error(data?.error || "Failed to get response");
