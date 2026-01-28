@@ -21,8 +21,7 @@ const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
-  const webhookUrl = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL as string | undefined;
+  const chatEndpoint = "/api/chat";
 
   useEffect(() => {
     const storedSessionId = window.localStorage.getItem("chat_session_id");
@@ -54,7 +53,6 @@ const ChatAssistant = () => {
     setIsLoading(true);
 
     try {
-      const chatEndpoint = webhookUrl || `${apiBaseUrl}/api/chat`;
       const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
