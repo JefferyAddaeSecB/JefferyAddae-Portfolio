@@ -196,6 +196,8 @@ const ContactForm = () => {
           <Input
             id="firstName"
             name="firstName"
+            type="text"
+            autoComplete="given-name"
             value={formData.firstName}
             onChange={handleChange}
             placeholder="John"
@@ -217,6 +219,8 @@ const ContactForm = () => {
           <Input
             id="lastName"
             name="lastName"
+            type="text"
+            autoComplete="family-name"
             value={formData.lastName}
             onChange={handleChange}
             placeholder="Doe"
@@ -240,6 +244,7 @@ const ContactForm = () => {
           id="email"
           name="email"
           type="email"
+          autoComplete="email"
           value={formData.email}
           onChange={handleChange}
           placeholder="john@example.com"
@@ -262,6 +267,8 @@ const ContactForm = () => {
           <Input
             id="company"
             name="company"
+            type="text"
+            autoComplete="organization"
             value={formData.company}
             onChange={handleChange}
             placeholder="Acme Inc"
@@ -275,6 +282,8 @@ const ContactForm = () => {
           <Input
             id="role"
             name="role"
+            type="text"
+            autoComplete="organization-title"
             value={formData.role}
             onChange={handleChange}
             placeholder="Operations Manager"
