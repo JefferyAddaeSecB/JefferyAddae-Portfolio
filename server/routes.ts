@@ -327,4 +327,98 @@ export async function registerRoutes(app: Express): Promise<void> {
       });
     }
   });
+
+  /**
+   * POST /api/chat
+   * 
+   * Chat endpoint - proxies messages to n8n webhook
+   * Request body: { sessionId, message, context }
+   * Response: { success, message, timestamp, suggestedAction, intent }
+   */
+  app.post("/api/chat", async (req: Request, res: Response) => {
+    try {
+      const { sessionId, message, context } = req.body;
+
+      // Validate required fields
+      if (!message || typeof message !== "string" || message.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Message is required and must be a non-empty string"
+        });
+      }
+
+      if (!sessionId || typeof sessionId !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "Session ID is required"
+        });
+      }
+
+      // Get n8n webhook URL from environment
+      const webhookUrl = process.env.N8N_CHAT_WEBHOOK_URL;
+      if (!webhookUrl) {
+        console.error("❌ N8N_CHAT_WEBHOOK_URL not configured");
+        return res.status(500).json({
+          success: false,
+          error: "Chat service not configured"
+        });
+      }
+
+      console.log("🔗 Forwarding to n8n:", webhookUrl);
+      console.log("📤 Chat message:", { sessionId, message: message.substring(0, 50) + "..." });
+
+      // Forward request to n8n
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId,
+          message: message.trim(),
+          context: context || {}
+        })
+      });
+
+      console.log("📥 n8n response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ n8n error:", response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          error: `n8n service error: ${response.status}`
+        });
+      }
+
+      // Parse n8n response
+      let data: any;
+      const contentType = response.headers.get("content-type");
+      
+      if (contentType?.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text, success: true };
+      }
+
+      console.log("📥 n8n response data:", data);
+
+      // Return response to frontend
+      return res.status(200).json({
+        success: true,
+        message: data.message || data.text || "Response received from assistant",
+        timestamp: data.timestamp || new Date().toISOString(),
+        suggestedAction: data.suggestedAction,
+        intent: data.intent
+      });
+
+    } catch (error) {
+      console.error("❌ Chat endpoint error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error"
+      });
+    }
+  });
 }
