@@ -151,11 +151,20 @@ const ContactForm = () => {
       }, 15000);
     } catch (error) {
       const errorCode = (error as { code?: string })?.code ?? "unknown";
-      console.error("Contact form submission failed:", error);
-      const isPermissionError = errorCode === "permission-denied";
-      const message = isPermissionError
-        ? "Message could not be saved. Firestore rules may be blocking writes."
-        : "Something went wrong while sending. Please try again or email directly.";
+      const errorMessage = (error as { message?: string })?.message ?? "";
+      
+      console.error("Contact form submission failed:", { errorCode, errorMessage, error });
+      
+      let message = "Something went wrong while sending. Please try again or email directly.";
+      
+      if (errorCode === "permission-denied") {
+        message = "Firebase permissions issue. Please contact support.";
+      } else if (errorCode === "unavailable" || errorMessage.includes("timeout")) {
+        message = "Connection timeout. Please check your internet and try again.";
+      } else if (errorCode === "unauthenticated") {
+        message = "Authentication issue. Please refresh and try again.";
+      }
+      
       setErrors({
         submit: message,
       });

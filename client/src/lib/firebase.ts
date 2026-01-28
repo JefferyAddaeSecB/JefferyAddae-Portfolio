@@ -23,6 +23,20 @@ if (!isFirebaseConfigured) {
 
 const app = initializeApp(firebaseConfig);
 
+// Initialize Firestore with proper error handling
 export const firestore = getFirestore(app);
+
+// Enable offline persistence for better reliability
+if (isFirebaseConfigured && typeof window !== "undefined") {
+  import("firebase/firestore").then(({ enableIndexedDbPersistence }) => {
+    enableIndexedDbPersistence(firestore).catch((err) => {
+      if (err.code === "failed-precondition") {
+        console.debug("Multiple tabs open, Firestore persistence disabled");
+      } else if (err.code === "unimplemented") {
+        console.debug("Browser doesn't support Firestore persistence");
+      }
+    });
+  });
+}
 
 export default app;
