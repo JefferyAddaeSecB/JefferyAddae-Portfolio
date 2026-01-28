@@ -7,10 +7,18 @@ import fs from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from .env.local first, then .env
+// Load environment variables in priority order:
+// 1. .env.local (development overrides)
+// 2. .env.production (production defaults)
+// 3. .env (shared defaults)
 const envLocalPath = path.join(__dirname, "..", ".env.local");
+const envProductionPath = path.join(__dirname, "..", ".env.production");
+
 if (fs.existsSync(envLocalPath)) {
   dotenv.config({ path: envLocalPath });
+}
+if (fs.existsSync(envProductionPath)) {
+  dotenv.config({ path: envProductionPath });
 }
 dotenv.config();
 
