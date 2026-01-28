@@ -215,11 +215,12 @@ export default function ChatAssistant() {
       const data = await response.json();
       console.log('📥 Response data:', data);
 
-      if (data.success) {
+      // Handle both success flag and message presence
+      if (data.success || data.message) {
         const assistantMessage: Message = {
           role: 'assistant',
-          content: data.message,
-          timestamp: data.timestamp,
+          content: data.message || 'Message received',
+          timestamp: data.timestamp || new Date().toISOString(),
           suggestedAction: data.suggestedAction,
           intent: data.intent
         };
@@ -300,11 +301,11 @@ export default function ChatAssistant() {
       const data = await response.json();
       console.log('📥 Response data:', data);
 
-      if (data.success) {
+      if (data.success || data.message) {
         const assistantMessage: Message = {
           role: 'assistant',
-          content: data.message,
-          timestamp: data.timestamp,
+          content: data.message || 'Message received',
+          timestamp: data.timestamp || new Date().toISOString(),
           suggestedAction: data.suggestedAction,
           intent: data.intent
         };
