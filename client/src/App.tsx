@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import Loading from "@/components/Loading";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import ChatAssistant from "@/components/ChatAssistant";
 import { Suspense, useEffect, useLayoutEffect, lazy } from "react";
 
 // Lazily load pages/components to shrink the initial bundle
@@ -96,6 +97,7 @@ function App() {
       </main>
       <Footer />
       <ScrollToTop />
+      <ChatAssistant />
       <Suspense fallback={null}>
         <CursorPatternBackground 
           color="#3b82f6"
