@@ -1,0 +1,214 @@
+{
+  "name": "Cold Outreach Automation System",
+  "description": "Automated cold email sequences with AI personalization and response tracking",
+  "nodes": [
+    {
+      "name": "Get Prospects from Notion",
+      "type": "n8n-nodes-base.notion",
+      "position": [250, 300],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "YOUR_COLD_LEADS_DATABASE_ID",
+        "filters": {
+          "conditions": [
+            {
+              "property": "Status",
+              "condition": "equals",
+              "value": "Ready to Contact"
+            },
+            {
+              "property": "Email Sent",
+              "condition": "equals",
+              "value": false
+            }
+          ]
+        }
+      },
+      "notes": "Fetches prospects who are ready for outreach. Run daily via schedule trigger."
+    },
+    {
+      "name": "AI Personalization",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.OPENROUTER_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "nvidia/nemotron-3-nano-30b-a3b:free"
+            },
+            {
+              "name": "messages",
+              "value": "[{\"role\": \"user\", \"content\": \"Write a personalized cold email for: {{$json.companyName}} in the {{$json.industry}} industry. They need: {{$json.painPoint}}. Keep it under 150 words, friendly, and focus on how automation can save them 10+ hours/week. Include a clear CTA to book a 15-min call.\"}]"
+            }
+          ]
+        }
+      },
+      "notes": "Uses AI to write personalized emails for each prospect based on their industry and pain points"
+    },
+    {
+      "name": "Send Email via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [650, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.email}}",
+        "subject": "Quick question about {{$json.companyName}}'s operations",
+        "message": "={{$json.personalizedEmail}}",
+        "options": {
+          "attachments": "",
+          "ccList": "",
+          "bccList": ""
+        }
+      },
+      "notes": "Sends the personalized email via your Gmail account"
+    },
+    {
+      "name": "Update Notion - Email Sent",
+      "type": "n8n-nodes-base.notion",
+      "position": [850, 300],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{$json.notionPageId}}",
+        "properties": {
+          "Status": "Email Sent - Awaiting Reply",
+          "Email Sent": true,
+          "Email Sent Date": "={{new Date().toISOString()}}",
+          "Follow Up Date": "={{new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()}}"
+        }
+      },
+      "notes": "Marks the prospect as contacted and sets follow-up date for 3 days later"
+    },
+    {
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "position": [1050, 300],
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "notes": "Waits 3 days before sending follow-up"
+    },
+    {
+      "name": "Check for Reply",
+      "type": "n8n-nodes-base.gmail",
+      "position": [1250, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "filters": {
+          "from": "={{$json.email}}",
+          "receivedAfter": "={{$json.emailSentDate}}"
+        }
+      },
+      "notes": "Checks if prospect replied"
+    },
+    {
+      "name": "Route Based on Reply",
+      "type": "n8n-nodes-base.if",
+      "position": [1450, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.messages.length}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "notes": "If they replied, stop sequence. If not, send follow-up."
+    },
+    {
+      "name": "Send Follow-Up 1",
+      "type": "n8n-nodes-base.gmail",
+      "position": [1650, 400],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.email}}",
+        "subject": "Re: Quick question about {{$json.companyName}}'s operations",
+        "message": "Hi {{$json.firstName}},\n\nJust wanted to follow up on my previous email.\n\nI recently helped a company in {{$json.industry}} automate their {{$json.painPoint}} and they're now saving 12 hours/week.\n\nWould love to show you how we could do the same for {{$json.companyName}}.\n\nFree to chat for 15 minutes this week?\n\nBest,\nJeffery | DELLYKNOWSTECH\n\nP.S. Here's a quick case study: [link]"
+      },
+      "notes": "Follow-up #1 with social proof"
+    },
+    {
+      "name": "Mark as Interested",
+      "type": "n8n-nodes-base.notion",
+      "position": [1650, 200],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{$json.notionPageId}}",
+        "properties": {
+          "Status": "🎯 Replied - Hot Lead!",
+          "Tags": "Interested"
+        }
+      },
+      "notes": "Updates status if they replied - manual follow-up needed"
+    }
+  ],
+  "connections": {
+    "Get Prospects from Notion": {
+      "main": [[{"node": "AI Personalization", "type": "main", "index": 0}]]
+    },
+    "AI Personalization": {
+      "main": [[{"node": "Send Email via Gmail", "type": "main", "index": 0}]]
+    },
+    "Send Email via Gmail": {
+      "main": [[{"node": "Update Notion - Email Sent", "type": "main", "index": 0}]]
+    },
+    "Update Notion - Email Sent": {
+      "main": [[{"node": "Wait 3 Days", "type": "main", "index": 0}]]
+    },
+    "Wait 3 Days": {
+      "main": [[{"node": "Check for Reply", "type": "main", "index": 0}]]
+    },
+    "Check for Reply": {
+      "main": [[{"node": "Route Based on Reply", "type": "main", "index": 0}]]
+    },
+    "Route Based on Reply": {
+      "main": [
+        [{"node": "Mark as Interested", "type": "main", "index": 0}],
+        [{"node": "Send Follow-Up 1", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "triggers": [
+    {
+      "name": "Daily at 9am",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 9,
+              "minute": 0
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

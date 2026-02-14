@@ -1,0 +1,246 @@
+{
+  "name": "Client Onboarding Automation",
+  "description": "Automates the entire client onboarding process from contract signing to project kickoff",
+  "nodes": [
+    {
+      "name": "Trigger: Meeting Booked",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "parameters": {
+        "path": "meeting-booked",
+        "httpMethod": "POST"
+      },
+      "notes": "Triggered when Calendly meeting is booked or manually via webhook"
+    },
+    {
+      "name": "Send Meeting Confirmation",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [450, 300],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.clientEmail}}",
+        "subject": "Meeting Confirmed: {{$json.meetingDate}} - Let's Build Something Great!",
+        "html": "<h2>Hi {{$json.clientName}}! 👋</h2><p>Excited for our call on <strong>{{$json.meetingDate}} at {{$json.meetingTime}}</strong>!</p><h3>What to Expect:</h3><ul><li>15-30 minute discovery call</li><li>I'll share my screen and show examples</li><li>We'll discuss your specific needs</li><li>You'll get a clear roadmap and pricing</li></ul><h3>Before Our Call:</h3><p>To make the most of our time, please fill out this quick questionnaire (2 minutes):</p><p><a href='{{$json.intakeFormLink}}' style='background:#1a202c;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;'>Complete Intake Form</a></p><h3>Meeting Details:</h3><p><strong>Date:</strong> {{$json.meetingDate}}<br><strong>Time:</strong> {{$json.meetingTime}}<br><strong>Zoom Link:</strong> <a href='{{$json.zoomLink}}'>{{$json.zoomLink}}</a></p><p>Need to reschedule? Just reply to this email.</p><p>Looking forward to it!<br>Jeffery | DELLYKNOWSTECH</p>"
+      },
+      "notes": "Sends immediate meeting confirmation with intake form"
+    },
+    {
+      "name": "Create Notion Project Page",
+      "type": "n8n-nodes-base.notion",
+      "position": [450, 400],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "YOUR_PROJECTS_DATABASE_ID",
+        "properties": {
+          "Client Name": "={{$json.clientName}}",
+          "Email": "={{$json.clientEmail}}",
+          "Status": "Discovery Call Scheduled",
+          "Meeting Date": "={{$json.meetingDate}}",
+          "Meeting Link": "={{$json.zoomLink}}"
+        }
+      },
+      "notes": "Creates project tracking page in Notion CRM"
+    },
+    {
+      "name": "Wait 24 Hours Before Meeting",
+      "type": "n8n-nodes-base.wait",
+      "position": [650, 300],
+      "parameters": {
+        "resume": "webhook",
+        "amount": 1,
+        "unit": "days"
+      },
+      "notes": "Waits until 24 hours before meeting"
+    },
+    {
+      "name": "Send Meeting Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [850, 300],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.clientEmail}}",
+        "subject": "Tomorrow: Our Call at {{$json.meetingTime}}",
+        "html": "<h2>Hey {{$json.clientName}}! 👋</h2><p>Quick reminder: We're chatting tomorrow at <strong>{{$json.meetingTime}}</strong>.</p><h3>I'll Be Ready to Show You:</h3><ul><li>3 quick wins we can implement immediately</li><li>Similar projects I've completed</li><li>Exact timeline and investment</li></ul><p><strong>Zoom Link:</strong> <a href='{{$json.zoomLink}}'>{{$json.zoomLink}}</a></p><p>Did you complete the intake form? If not, here it is again:<br><a href='{{$json.intakeFormLink}}'>Complete Intake Form</a></p><p>See you tomorrow!<br>Jeffery</p>"
+      },
+      "notes": "24-hour meeting reminder"
+    },
+    {
+      "name": "Trigger: Proposal Accepted",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 600],
+      "parameters": {
+        "path": "proposal-accepted",
+        "httpMethod": "POST"
+      },
+      "notes": "Manual trigger when client accepts proposal/contract"
+    },
+    {
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [450, 600],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.clientEmail}}",
+        "subject": "🎉 Welcome Aboard! Here's What Happens Next",
+        "html": "<h1>Welcome to the Team! 🚀</h1><p>Hi {{$json.clientName}},</p><p>I'm thrilled to work with you on {{$json.projectName}}!</p><h2>What Happens Next:</h2><h3>📋 Step 1: Contract & Payment (Today)</h3><p>Please sign the contract and submit the deposit payment:</p><ul><li><a href='{{$json.contractLink}}'>📄 Sign Contract</a></li><li><a href='{{$json.paymentLink}}'>💳 Submit Deposit ({{$json.depositAmount}})</a></li></ul><h3>📁 Step 2: Access Your Client Portal</h3><p>I've created a shared workspace for our project:</p><p><a href='{{$json.clientPortalLink}}' style='background:#1a202c;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;'>Access Client Portal</a></p><p>Inside you'll find:<ul><li>Project roadmap & timeline</li><li>Shared files folder</li><li>Meeting notes</li><li>Progress updates</li></ul></p><h3>🗓️ Step 3: Kickoff Call</h3><p>Once payment is received, we'll schedule our kickoff call to dive into requirements.</p><h3>📞 Questions?</h3><p>Just reply to this email or text me: {{$json.yourPhone}}</p><p>Excited to get started!<br>Jeffery | DELLYKNOWSTECH</p>"
+      },
+      "notes": "Welcome email with contract, payment link, and client portal"
+    },
+    {
+      "name": "Create Client Portal (Google Drive/Notion)",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [450, 700],
+      "parameters": {
+        "operation": "create",
+        "folderId": "YOUR_CLIENTS_FOLDER_ID",
+        "name": "={{$json.clientName}} - {{$json.projectName}}"
+      },
+      "notes": "Creates shared Google Drive folder for client files"
+    },
+    {
+      "name": "Update Notion: Project Onboarding",
+      "type": "n8n-nodes-base.notion",
+      "position": [650, 600],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{$json.notionPageId}}",
+        "properties": {
+          "Status": "Contract Sent - Awaiting Signature",
+          "Contract Link": "={{$json.contractLink}}",
+          "Payment Link": "={{$json.paymentLink}}",
+          "Client Portal": "={{$json.clientPortalLink}}"
+        }
+      },
+      "notes": "Updates project status in Notion"
+    },
+    {
+      "name": "Wait for Contract Signature",
+      "type": "n8n-nodes-base.webhook",
+      "position": [850, 600],
+      "parameters": {
+        "path": "contract-signed",
+        "httpMethod": "POST"
+      },
+      "notes": "Webhook triggered by DocuSign/HelloSign when contract signed"
+    },
+    {
+      "name": "Send Thank You + Next Steps",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1050, 600],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.clientEmail}}",
+        "subject": "Contract Signed! ✅ Ready to Build",
+        "html": "<h2>Perfect! 🎉</h2><p>Hi {{$json.clientName}},</p><p>Contract signed! Once the deposit payment clears (usually 1-2 business days), we'll kick things off.</p><h3>While You Wait:</h3><ol><li>Check out your client portal: <a href='{{$json.clientPortalLink}}'>Client Portal</a></li><li>Upload any reference materials (logos, branding, examples)</li><li>Jot down any additional ideas or requirements</li></ol><h3>Timeline Reminder:</h3><ul><li><strong>Start Date:</strong> {{$json.startDate}}</li><li><strong>Expected Completion:</strong> {{$json.completionDate}}</li><li><strong>First Milestone:</strong> {{$json.milestone1}}</li></ul><p>I'll send you a kickoff call invite once payment processes.</p><p>Questions? Just reply!<br>Jeffery</p>"
+      },
+      "notes": "Confirmation that contract is signed"
+    },
+    {
+      "name": "Wait for Payment",
+      "type": "n8n-nodes-base.webhook",
+      "position": [1250, 600],
+      "parameters": {
+        "path": "payment-received",
+        "httpMethod": "POST"
+      },
+      "notes": "Webhook from Stripe when payment received"
+    },
+    {
+      "name": "Update Notion: Payment Received",
+      "type": "n8n-nodes-base.notion",
+      "position": [1450, 600],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{$json.notionPageId}}",
+        "properties": {
+          "Status": "Ready to Start",
+          "Payment Status": "Deposit Paid",
+          "Paid Amount": "={{$json.depositAmount}}"
+        }
+      },
+      "notes": "Marks payment as received"
+    },
+    {
+      "name": "Send Kickoff Scheduling Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1450, 700],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.clientEmail}}",
+        "subject": "🚀 Let's Kick This Off! Schedule Your First Call",
+        "html": "<h2>Payment Received! 💰</h2><p>Hi {{$json.clientName}},</p><p>Awesome news — your deposit payment just cleared!</p><h3>Next Step: Kickoff Call</h3><p>Let's schedule our project kickoff call to finalize requirements and get started.</p><p>Pick a time that works for you:</p><p><a href='{{$json.calendlyLink}}' style='background:#1a202c;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;'>Schedule Kickoff Call</a></p><h3>What We'll Cover:</h3><ul><li>Detailed requirements walkthrough</li><li>Design preferences & branding</li><li>Access credentials (if needed)</li><li>Timeline confirmation</li><li>Your questions</li></ul><p>Typically takes 30-45 minutes.</p><p>See you soon!<br>Jeffery</p>"
+      },
+      "notes": "Asks client to schedule kickoff meeting"
+    },
+    {
+      "name": "Create Project Tasks (Optional)",
+      "type": "n8n-nodes-base.notion",
+      "position": [1650, 600],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "YOUR_TASKS_DATABASE_ID",
+        "properties": {
+          "Task": "Kickoff Call",
+          "Project": "={{$json.projectName}}",
+          "Status": "To Do",
+          "Due Date": "={{$json.kickoffDate}}"
+        }
+      },
+      "notes": "Creates initial project tasks automatically"
+    }
+  ],
+  "connections": {
+    "Trigger: Meeting Booked": {
+      "main": [
+        [
+          {"node": "Send Meeting Confirmation", "type": "main", "index": 0},
+          {"node": "Create Notion Project Page", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Send Meeting Confirmation": {
+      "main": [[{"node": "Wait 24 Hours Before Meeting", "type": "main", "index": 0}]]
+    },
+    "Wait 24 Hours Before Meeting": {
+      "main": [[{"node": "Send Meeting Reminder", "type": "main", "index": 0}]]
+    },
+    "Trigger: Proposal Accepted": {
+      "main": [
+        [
+          {"node": "Send Welcome Email", "type": "main", "index": 0},
+          {"node": "Create Client Portal (Google Drive/Notion)", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [[{"node": "Update Notion: Project Onboarding", "type": "main", "index": 0}]]
+    },
+    "Update Notion: Project Onboarding": {
+      "main": [[{"node": "Wait for Contract Signature", "type": "main", "index": 0}]]
+    },
+    "Wait for Contract Signature": {
+      "main": [[{"node": "Send Thank You + Next Steps", "type": "main", "index": 0}]]
+    },
+    "Send Thank You + Next Steps": {
+      "main": [[{"node": "Wait for Payment", "type": "main", "index": 0}]]
+    },
+    "Wait for Payment": {
+      "main": [
+        [
+          {"node": "Update Notion: Payment Received", "type": "main", "index": 0},
+          {"node": "Send Kickoff Scheduling Email", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Update Notion: Payment Received": {
+      "main": [[{"node": "Create Project Tasks (Optional)", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

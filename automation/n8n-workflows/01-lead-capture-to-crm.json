@@ -1,0 +1,160 @@
+{
+  "name": "Lead Capture → CRM Pipeline",
+  "description": "Automatically capture leads from your portfolio contact form, score them, and add to Notion CRM with smart follow-ups",
+  "nodes": [
+    {
+      "name": "Webhook - Portfolio Contact Form",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "parameters": {
+        "path": "portfolio-lead",
+        "responseMode": "responseNode",
+        "responseData": "allEntries"
+      },
+      "notes": "This receives data from your contact form when someone submits. URL: https://your-n8n.com/webhook/portfolio-lead"
+    },
+    {
+      "name": "Score Lead",
+      "type": "n8n-nodes-base.function",
+      "position": [450, 300],
+      "parameters": {
+        "functionCode": "// Lead Scoring Algorithm\nconst lead = items[0].json;\n\nlet score = 0;\nlet priority = 'Low';\nlet tags = [];\n\n// Budget scoring\nif (lead.budget === '$4,000–$10,000+') {\n  score += 40;\n  tags.push('High Budget');\n} else if (lead.budget === '$1,500–$4,000') {\n  score += 25;\n  tags.push('Medium Budget');\n} else if (lead.budget === '$500–$1,200') {\n  score += 10;\n  tags.push('Starter Budget');\n}\n\n// Timeline urgency\nif (lead.timeline === 'ASAP') {\n  score += 30;\n  tags.push('Urgent');\n} else if (lead.timeline === '1–2 weeks') {\n  score += 20;\n  tags.push('Near-term');\n} else if (lead.timeline === '2–4 weeks') {\n  score += 10;\n}\n\n// Goal/Service type scoring\nif (lead.goal === 'Internal ops automation') {\n  score += 20;\n  tags.push('High-Value Service');\n} else if (lead.goal === 'Lead capture & follow-up') {\n  score += 20;\n  tags.push('Marketing Automation');\n} else if (lead.goal === 'Customer support automation') {\n  score += 15;\n  tags.push('Support Automation');\n}\n\n// Company presence indicates seriousness\nif (lead.company && lead.company.length > 0) {\n  score += 10;\n  tags.push('Has Company');\n}\n\n// Determine priority\nif (score >= 70) {\n  priority = 'Hot';\n  tags.push('🔥 HOT LEAD');\n} else if (score >= 40) {\n  priority = 'Warm';\n  tags.push('⚡ Warm Lead');\n} else {\n  priority = 'Cold';\n  tags.push('❄️ Cold Lead');\n}\n\nreturn [{\n  json: {\n    ...lead,\n    score: score,\n    priority: priority,\n    tags: tags,\n    capturedAt: new Date().toISOString(),\n    status: 'New',\n    followUpDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow\n  }\n}];"
+      },
+      "notes": "Scores leads based on budget, timeline, and service type. Hot leads (70+) get immediate attention."
+    },
+    {
+      "name": "Add to Notion CRM",
+      "type": "n8n-nodes-base.notion",
+      "position": [650, 300],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "YOUR_NOTION_DATABASE_ID",
+        "properties": {
+          "Name": "={{$json.name}}",
+          "Email": "={{$json.email}}",
+          "Company": "={{$json.company}}",
+          "Goal": "={{$json.goal}}",
+          "Budget": "={{$json.budget}}",
+          "Timeline": "={{$json.timeline}}",
+          "Details": "={{$json.details}}",
+          "Score": "={{$json.score}}",
+          "Priority": "={{$json.priority}}",
+          "Tags": "={{$json.tags.join(', ')}}",
+          "Status": "New Lead",
+          "Captured Date": "={{$json.capturedAt}}",
+          "Follow Up Date": "={{$json.followUpDate}}"
+        }
+      },
+      "notes": "Creates a new page in your Notion CRM database with all lead details"
+    },
+    {
+      "name": "Route by Priority",
+      "type": "n8n-nodes-base.switch",
+      "position": [850, 300],
+      "parameters": {
+        "dataPropertyName": "priority",
+        "rules": {
+          "rules": [
+            {
+              "value": "Hot",
+              "output": 0
+            },
+            {
+              "value": "Warm",
+              "output": 1
+            },
+            {
+              "value": "Cold",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "notes": "Routes leads to different follow-up sequences based on priority"
+    },
+    {
+      "name": "Send HOT Lead Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1050, 200],
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "your-email@gmail.com",
+        "subject": "🔥 HOT LEAD ALERT: {{$json.name}} - {{$json.budget}}",
+        "text": "HIGH PRIORITY LEAD RECEIVED!\n\nName: {{$json.name}}\nEmail: {{$json.email}}\nCompany: {{$json.company}}\nBudget: {{$json.budget}}\nTimeline: {{$json.timeline}}\nGoal: {{$json.goal}}\n\nScore: {{$json.score}}/100\n\nDetails:\n{{$json.details}}\n\n⚡ ACTION REQUIRED: Contact within 1 hour for best conversion rate!\n\nView in Notion: [Link to your Notion database]",
+        "html": ""
+      },
+      "notes": "Immediately alerts you via email when a hot lead comes in"
+    },
+    {
+      "name": "Start Hot Lead Sequence",
+      "type": "n8n-nodes-base.webhook",
+      "position": [1050, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-hot-sequence"
+      },
+      "notes": "Triggers personalized outreach for hot leads"
+    },
+    {
+      "name": "Start Warm Lead Sequence",
+      "type": "n8n-nodes-base.webhook",
+      "position": [1050, 400],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-warm-sequence"
+      },
+      "notes": "Starts standard follow-up for warm leads"
+    },
+    {
+      "name": "Start Cold Lead Sequence",
+      "type": "n8n-nodes-base.webhook",
+      "position": [1050, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-cold-sequence"
+      },
+      "notes": "Adds to nurture sequence for cold leads"
+    },
+    {
+      "name": "Respond to Website",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [1250, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\": true, \"message\": \"Thank you! We'll be in touch soon.\", \"priority\": \"{{$json.priority}}\"}"
+      },
+      "notes": "Sends response back to your website"
+    }
+  ],
+  "connections": {
+    "Webhook - Portfolio Contact Form": {
+      "main": [[{"node": "Score Lead", "type": "main", "index": 0}]]
+    },
+    "Score Lead": {
+      "main": [[{"node": "Add to Notion CRM", "type": "main", "index": 0}]]
+    },
+    "Add to Notion CRM": {
+      "main": [[{"node": "Route by Priority", "type": "main", "index": 0}]]
+    },
+    "Route by Priority": {
+      "main": [
+        [{"node": "Send HOT Lead Alert", "type": "main", "index": 0}, {"node": "Start Hot Lead Sequence", "type": "main", "index": 0}],
+        [{"node": "Start Warm Lead Sequence", "type": "main", "index": 0}],
+        [{"node": "Start Cold Lead Sequence", "type": "main", "index": 0}]
+      ]
+    },
+    "Start Hot Lead Sequence": {
+      "main": [[{"node": "Respond to Website", "type": "main", "index": 0}]]
+    },
+    "Start Warm Lead Sequence": {
+      "main": [[{"node": "Respond to Website", "type": "main", "index": 0}]]
+    },
+    "Start Cold Lead Sequence": {
+      "main": [[{"node": "Respond to Website", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
