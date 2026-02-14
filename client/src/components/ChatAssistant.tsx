@@ -94,6 +94,66 @@ function ChatNudge({ isChatOpen }: { isChatOpen: boolean }) {
   );
 }
 
+function AiSystemAvatar({ className = 'h-10 w-10' }: { className?: string }) {
+  return (
+    <div
+      className={`${className} relative overflow-hidden rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0`}
+      aria-hidden="true"
+    >
+      <span className="absolute inset-1 rounded-full bg-white/20 blur-[2px]" />
+      <svg
+        className="relative z-10 h-5 w-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 4.5V6" />
+        <rect x="6" y="6" width="12" height="10.5" rx="3" />
+        <path d="M6 10.8H4.5" />
+        <path d="M19.5 10.8H18" />
+        <circle cx="9.5" cy="11.2" r="0.7" fill="currentColor" stroke="none" />
+        <circle cx="14.5" cy="11.2" r="0.7" fill="currentColor" stroke="none" />
+        <path d="M9.2 14h5.6" />
+      </svg>
+    </div>
+  );
+}
+
+function HumanSupportAvatar({ className = 'h-8 w-8' }: { className?: string }) {
+  return (
+    <div
+      className={`${className} rounded-full bg-blue-700 text-white flex items-center justify-center flex-shrink-0`}
+      aria-hidden="true"
+    >
+      <svg
+        className="h-[22px] w-[22px]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path
+          d="M4.8 12.6a7.2 7.2 0 0 1 14.4 0"
+        />
+        <path
+          d="M5.2 12.8V15a1.8 1.8 0 0 0 1.8 1.8H8v-4.2H7a1.8 1.8 0 0 0-1.8 1.8Z"
+        />
+        <path
+          d="M18.8 12.8V15a1.8 1.8 0 0 1-1.8 1.8H16v-4.2h1a1.8 1.8 0 0 1 1.8 1.8Z"
+        />
+        <circle cx="12" cy="9.3" r="2.1" />
+        <path d="M9.3 16.3c.8-.9 1.7-1.3 2.7-1.3s1.9.4 2.7 1.3" />
+        <path d="M17 16.8h1.4a1 1 0 0 1 1 1v.2a1 1 0 0 1-1 1h-2.4" />
+      </svg>
+    </div>
+  );
+}
+
 export default function ChatAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -285,6 +345,17 @@ export default function ChatAssistant() {
   return (
     <>
       <style>{`
+        @keyframes chat-dot-bounce {
+          0%, 80%, 100% {
+            transform: translateY(0);
+            opacity: 0.45;
+          }
+          40% {
+            transform: translateY(-3px);
+            opacity: 1;
+          }
+        }
+
         .safe-sides {
           padding-left: max(1rem, env(safe-area-inset-left));
           padding-right: max(1rem, env(safe-area-inset-right));
@@ -294,10 +365,46 @@ export default function ChatAssistant() {
           padding-bottom: max(1rem, env(safe-area-inset-bottom));
         }
 
+        .typing-dots {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          width: 26px;
+          height: 6px;
+        }
+
+        .typing-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: #3B82F6;
+          animation: chat-dot-bounce 0.8s ease-in-out infinite;
+        }
+
+        .typing-fallback {
+          display: none;
+          width: 26px;
+          text-align: center;
+          color: #3B82F6;
+          font-size: 12px;
+          line-height: 1;
+          font-weight: 700;
+        }
+
         /* Mobile keyboard handling */
         @media (max-height: 600px) {
           .messages-mobile {
             max-height: 50vh;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .typing-dots {
+            display: none;
+          }
+
+          .typing-fallback {
+            display: inline-block;
           }
         }
       `}</style>
@@ -363,13 +470,13 @@ export default function ChatAssistant() {
               {/* Top Row: Title and Close */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  {/* Bot Avatar */}
-                  <div className="text-2xl font-bold flex-shrink-0">🤖</div>
+                  {/* AI System Avatar */}
+                  <AiSystemAvatar className="h-9 w-9" />
 
                   {/* Title and Beta Badge */}
                   <div className="flex items-center gap-1.5 min-w-0">
                     <h3 className="font-semibold text-base whitespace-nowrap">Jeffery AI</h3>
-                    <span className="px-2 py-0.5 bg-white/30 text-white text-[10px] font-medium rounded-full flex-shrink-0">
+                    <span className="px-2 py-0.5 bg-white/20 text-white/70 text-[10px] font-medium rounded-full flex-shrink-0">
                       BETA
                     </span>
                   </div>
@@ -392,7 +499,7 @@ export default function ChatAssistant() {
                 {/* Status */}
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
-                  <span className="text-sm text-blue-100 font-medium">Online & Ready</span>
+                  <span className="text-sm text-blue-100 font-medium">Live AI Assistant</span>
                 </div>
 
                 {/* Refresh Button */}
@@ -421,18 +528,20 @@ export default function ChatAssistant() {
             {/* Messages Area - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-800 messages-mobile">
               {messages.length === 0 && (
-                <div className="text-center mt-8 space-y-4">
-                  <div className="text-5xl">👋</div>
-                  <div>
-                    <p className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
-                      Hi! I'm Jeffery's AI assistant.
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 px-4">
-                      I can help you learn about AI automation services, pricing, and process.
-                    </p>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-start gap-2">
+                    <HumanSupportAvatar className="h-8 w-8 mt-1" />
+                    <div className="max-w-[85%] bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600 p-4 rounded-[20px] shadow-[0_10px_26px_rgba(15,23,42,0.11)]">
+                      <p className="font-semibold text-base">
+                        Hi — I'm Jeffery's automation assistant.
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 leading-relaxed">
+                        I help businesses design and implement AI systems that save time and increase revenue.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-6 px-2">
+                  <div className="grid grid-cols-2 gap-2 pl-10">
                     {quickMessages.map((msg, idx) => (
                       <button
                         key={idx}
@@ -449,14 +558,21 @@ export default function ChatAssistant() {
                 </div>
               )}
 
-              {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {messages.map((msg, idx) => {
+                const isAssistant = msg.role === 'assistant';
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex ${isAssistant ? 'justify-start items-start gap-2' : 'justify-end'}`}
+                  >
+                    {isAssistant && <HumanSupportAvatar className="h-8 w-8 mt-1" />}
                   <div
                     className={`max-w-[85%] ${
                       msg.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
-                    } p-4 rounded-2xl shadow-sm`}
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600 shadow-[0_10px_26px_rgba(15,23,42,0.11)]'
+                    } p-4 rounded-[20px]`}
                   >
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
 
@@ -495,32 +611,28 @@ export default function ChatAssistant() {
                         </div>
                       )}
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
 
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-2xl shadow-sm flex items-center gap-2">
-                    {/* Agent Avatar */}
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                      <svg
-                        className="w-4 h-4 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                      </svg>
+                  <div
+                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-[20px] shadow-[0_10px_26px_rgba(15,23,42,0.11)] flex items-center gap-2"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {/* Human Support Avatar */}
+                    <HumanSupportAvatar className="h-8 w-8" />
+
+                    <div className="typing-dots" aria-hidden="true">
+                      <span className="typing-dot" style={{ animationDelay: '0ms' }} />
+                      <span className="typing-dot" style={{ animationDelay: '150ms' }} />
+                      <span className="typing-dot" style={{ animationDelay: '300ms' }} />
                     </div>
-
-                    {/* Static processing indicator */}
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Thinking...</div>
+                    <span className="typing-fallback" aria-hidden="true">...</span>
+                    <span className="sr-only">Assistant is thinking</span>
                   </div>
-                </div>
-              )}
-
-              {isLoading && (
-                <div className="sr-only" aria-live="polite">
-                  Assistant is thinking
                 </div>
               )}
 
