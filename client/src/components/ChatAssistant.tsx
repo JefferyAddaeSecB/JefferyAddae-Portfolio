@@ -10,7 +10,6 @@ interface Message {
   intent?: string;
 }
 
-// Chat Nudge Component
 const NUDGE_KEY = 'jeffrey_chat_nudge_dismissed_v1';
 const OPENED_KEY = 'jeffrey_chat_opened_v1';
 
@@ -43,18 +42,15 @@ function ChatNudge({ isChatOpen }: { isChatOpen: boolean }) {
     const opened = sessionStorage.getItem(OPENED_KEY) === '1';
     if (dismissed || opened || isChatOpen) return;
 
-    // Only show if user hasn't scrolled past 30%
-    const hasScrolledFar = () =>
+    const hasScrolledFar =
       window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight) > 0.3;
-    if (hasScrolledFar()) return;
+    if (hasScrolledFar) return;
 
-    const delay = isMobile ? 9000 : 4000;
-    const t = setTimeout(() => setShow(true), delay);
-
-    return () => clearTimeout(t);
+    const delay = isMobile ? 9000 : 4500;
+    const timer = window.setTimeout(() => setShow(true), delay);
+    return () => window.clearTimeout(timer);
   }, [isChatOpen, isMobile]);
 
-  // If user opens chat, permanently stop nudges this session
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isChatOpen) {
@@ -64,7 +60,9 @@ function ChatNudge({ isChatOpen }: { isChatOpen: boolean }) {
   }, [isChatOpen]);
 
   const dismiss = () => {
-    if (typeof window !== 'undefined') sessionStorage.setItem(NUDGE_KEY, '1');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(NUDGE_KEY, '1');
+    }
     setShow(false);
   };
 
@@ -72,73 +70,26 @@ function ChatNudge({ isChatOpen }: { isChatOpen: boolean }) {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        right: 24,
-        bottom: 110,
-        zIndex: 9999,
-        maxWidth: 260,
-        animation: 'fadeIn 0.3s ease-in',
-      }}
+      className={`fixed z-50 max-w-[260px] ${
+        isMobile ? 'bottom-24 right-4' : 'bottom-24 right-6'
+      }`}
       role="status"
       aria-live="polite"
     >
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.92)',
-          border: '1px solid rgba(0,0,0,0.06)',
-          borderRadius: 16,
-          padding: '10px 12px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'flex-start',
-        }}
-      >
-        <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.78)', lineHeight: 1.3 }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>Need help?</div>
-          <div>Questions about automation? I can help.</div>
-        </div>
-
+      <div className="relative rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900/95">
         <button
           onClick={dismiss}
-          aria-label="Dismiss"
-          style={{
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            fontSize: 18,
-            color: 'rgba(0,0,0,0.45)',
-            lineHeight: 1,
-            padding: 2,
-            flexShrink: 0,
-          }}
+          aria-label="Dismiss help nudge"
+          className="absolute right-2 top-1 text-lg leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           ×
         </button>
+        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Need help?</p>
+        <p className="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+          Questions about automation? I can help.
+        </p>
       </div>
-
-      {/* Pointer arrow */}
-      <div
-        style={{
-          width: 10,
-          height: 10,
-          background: 'rgba(255,255,255,0.92)',
-          borderLeft: '1px solid rgba(0,0,0,0.06)',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
-          transform: 'rotate(45deg)',
-          position: 'absolute',
-          right: 18,
-          bottom: -5,
-        }}
-      />
+      <div className="ml-auto mr-6 h-2.5 w-2.5 -translate-y-[1px] rotate-45 border-b border-r border-gray-200 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95" />
     </div>
   );
 }
@@ -168,7 +119,7 @@ export default function ChatAssistant() {
 
   // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages]);
 
   // Handle open/close - never auto-focus on open
@@ -210,11 +161,6 @@ export default function ChatAssistant() {
     setInput('');
     setIsLoading(true);
 
-    console.log('📤 Sending:', {
-      sessionId,
-      message: currentInput,
-    });
-
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -232,11 +178,7 @@ export default function ChatAssistant() {
         })
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response ok:', response.ok);
-
       const data = await response.json();
-      console.log('📥 Response data:', data);
 
       // Handle both success flag and message presence
       if (data.success || data.message) {
@@ -296,11 +238,6 @@ export default function ChatAssistant() {
     setInput('');
     setIsLoading(true);
 
-    console.log('📤 Sending:', {
-      sessionId,
-      message: text,
-    });
-
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -318,11 +255,7 @@ export default function ChatAssistant() {
         })
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response ok:', response.ok);
-
       const data = await response.json();
-      console.log('📥 Response data:', data);
 
       if (data.success || data.message) {
         const assistantMessage: Message = {
@@ -352,53 +285,6 @@ export default function ChatAssistant() {
   return (
     <>
       <style>{`
-        @keyframes slideUp {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes buttonBounce {
-          0%, 100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.05);
-          }
-        }
-
-        .chat-button-active {
-          animation: buttonBounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .chat-sheet {
-          animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .chat-nudge {
-          animation: fadeIn 0.3s ease-in;
-        }
-
-        .safe-bottom {
-          padding-bottom: max(1rem, env(safe-area-inset-bottom));
-        }
-
         .safe-sides {
           padding-left: max(1rem, env(safe-area-inset-left));
           padding-right: max(1rem, env(safe-area-inset-right));
@@ -422,9 +308,9 @@ export default function ChatAssistant() {
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed z-50 w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-2xl transition-all flex items-center justify-center group ${
+        className={`fixed z-50 h-14 w-14 rounded-full bg-blue-700 text-white shadow-md flex items-center justify-center ${
           isMobile ? 'bottom-6 right-6 safe-sides' : 'bottom-6 right-6'
-        } ${isOpen ? 'chat-button-active' : 'hover:scale-110'}`}
+        }`}
         aria-label="Open chat"
       >
         {isOpen ? (
@@ -437,7 +323,7 @@ export default function ChatAssistant() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
             {messages.length === 0 && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>
             )}
           </>
         )}
@@ -446,24 +332,23 @@ export default function ChatAssistant() {
       {/* Chat Window - Mobile Bottom Sheet / Desktop Floating */}
       {isOpen && (
         <>
-          {/* Backdrop - Only visible and clickable on mobile and desktop */}
-          <div
-            onClick={() => setIsOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setIsOpen(false);
-            }}
-            role="presentation"
-            className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm transition-opacity duration-200"
-            aria-hidden="true"
-          />
+          {/* Backdrop only on mobile to avoid desktop GPU cost */}
+          {isMobile && (
+            <div
+              onClick={() => setIsOpen(false)}
+              role="presentation"
+              className="fixed inset-0 z-40 bg-black/30"
+              aria-hidden="true"
+            />
+          )}
 
           {/* Chat Container */}
           <div
             ref={chatWindowRef}
-            className={`fixed chat-sheet z-50 bg-white dark:bg-gray-900 flex flex-col ${
+            className={`fixed z-50 bg-white dark:bg-gray-900 flex flex-col ${
               isMobile
                 ? 'inset-x-0 bottom-0 rounded-t-2xl h-[85vh] max-h-[85vh] w-full'
-                : 'bottom-24 right-6 w-[420px] h-[650px] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700'
+                : 'bottom-24 right-6 h-[650px] w-[420px] rounded-2xl border border-gray-200 shadow-md dark:border-gray-700'
             }`}
           >
             {/* Grab Handle - Mobile only */}
@@ -494,7 +379,7 @@ export default function ChatAssistant() {
                 <button
                   onClick={() => setIsOpen(false)}
                   title="Close chat"
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white/80 hover:text-white flex-shrink-0"
+                  className="p-2 rounded-lg text-white flex-shrink-0"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -506,7 +391,7 @@ export default function ChatAssistant() {
               <div className="flex items-center justify-between">
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
                   <span className="text-sm text-blue-100 font-medium">Online & Ready</span>
                 </div>
 
@@ -514,7 +399,7 @@ export default function ChatAssistant() {
                 <button
                   onClick={handleRefresh}
                   title="Start new conversation"
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white/80 hover:text-white flex-shrink-0"
+                  className="p-2 rounded-lg text-white flex-shrink-0"
                 >
                   <svg
                     className="w-5 h-5"
@@ -552,7 +437,7 @@ export default function ChatAssistant() {
                       <button
                         key={idx}
                         onClick={() => handleQuickMessage(msg.text)}
-                        className="p-3 bg-white dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition text-left border border-gray-200 dark:border-gray-600 group"
+                        className="p-3 bg-white dark:bg-gray-700 rounded-xl text-left border border-gray-200 dark:border-gray-600"
                       >
                         <div className="text-2xl mb-1">{msg.icon}</div>
                         <div className="text-xs text-gray-700 dark:text-gray-300 font-medium line-clamp-2">
@@ -583,27 +468,27 @@ export default function ChatAssistant() {
                           {msg.suggestedAction === 'book_call' && (
                             <a
                               href="/contact"
-                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition group"
+                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 font-semibold"
                             >
-                              <span className="group-hover:translate-x-1 transition-transform">→</span>
+                              <span>→</span>
                               <span>Book a Free ROI Audit</span>
                             </a>
                           )}
                           {msg.suggestedAction === 'view_case_studies' && (
                             <a
                               href="/projects"
-                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition group"
+                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 font-semibold"
                             >
-                              <span className="group-hover:translate-x-1 transition-transform">→</span>
+                              <span>→</span>
                               <span>View Case Studies</span>
                             </a>
                           )}
                           {msg.suggestedAction === 'contact_form' && (
                             <a
                               href="/contact"
-                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition group"
+                              className="inline-flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 font-semibold"
                             >
-                              <span className="group-hover:translate-x-1 transition-transform">→</span>
+                              <span>→</span>
                               <span>Send a Message</span>
                             </a>
                           )}
@@ -627,19 +512,15 @@ export default function ChatAssistant() {
                       </svg>
                     </div>
 
-                    {/* Processing Indicator */}
-                    <div className="flex space-x-1">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.1s' }}
-                      ></div>
-                      <div
-                        className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.2s' }}
-                      ></div>
-                    </div>
+                    {/* Static processing indicator */}
+                    <div className="text-sm text-gray-600 dark:text-gray-300">Thinking...</div>
                   </div>
+                </div>
+              )}
+
+              {isLoading && (
+                <div className="sr-only" aria-live="polite">
+                  Assistant is thinking
                 </div>
               )}
 
@@ -662,7 +543,7 @@ export default function ChatAssistant() {
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold flex items-center justify-center flex-shrink-0"
+                  className="px-4 py-3 bg-blue-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center flex-shrink-0"
                   title="Send message (or press Enter)"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
