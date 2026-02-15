@@ -49,21 +49,114 @@
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const timeline = String(item.json.timeline || '').toLowerCase();\n  const docsProvided = Number(item.json.docsProvided || 0);\n\n  let deterministicScore = 40;\n  if (budget >= 5000) deterministicScore += 20;\n  if (timeline.includes('asap') || timeline.includes('this week')) deterministicScore += 20;\n  if (docsProvided >= 3) deterministicScore += 20;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore,\n      readinessByRules: deterministicScore >= 80 ? 'kickoff_ready' : 'awaiting_documents',\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const errors = [];\n\n  const firstName = String(payload.firstName || payload.name || '').trim();\n  const email = String(payload.email || '').trim().toLowerCase();\n  const message = String(payload.message || '').trim();\n\n  if (!firstName) errors.push('firstName_missing');\n  if (!email) errors.push('email_missing');\n  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('email_invalid');\n  if (!message) errors.push('message_missing');\n\n  output.push({\n    json: {\n      ...payload,\n      firstName,\n      email,\n      message,\n      isValidIntake: errors.length === 0 ? 1 : 0,\n      validationErrors: errors,\n    },\n  });\n}\nreturn output;"
+      },
+      "id": "validate_required_fields",
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.isValidIntake}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "intake_valid_check",
+      "name": "Intake Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{\"⚠️ Invalid onboarding intake blocked: \" + ($json.email || \"unknown\") + \" | errors \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "slack_invalid_intake",
+      "name": "Slack Invalid Intake",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1080,
+        180
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Invalid Onboarding Intake",
+        "message": "={{\"Blocked intake for \" + ($json.email || \"unknown\") + \"\\nErrors: \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "gmail_invalid_intake",
+      "name": "Gmail Invalid Intake",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1080,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n\n  const envThreshold = Number(process.env.N8N_ONBOARDING_READINESS_THRESHOLD || 80);\n  const envRulesWeight = Number(process.env.N8N_ONBOARDING_RULES_WEIGHT || 0.65);\n  const envAiWeight = Number(process.env.N8N_ONBOARDING_AI_WEIGHT || 0.35);\n\n  const readinessThreshold = Number.isFinite(Number(payload.readinessThreshold))\n    ? Number(payload.readinessThreshold)\n    : (Number.isFinite(envThreshold) ? envThreshold : 80);\n  const rulesWeightRaw = Number.isFinite(Number(payload.rulesWeight))\n    ? Number(payload.rulesWeight)\n    : (Number.isFinite(envRulesWeight) ? envRulesWeight : 0.65);\n  const aiWeightRaw = Number.isFinite(Number(payload.aiWeight))\n    ? Number(payload.aiWeight)\n    : (Number.isFinite(envAiWeight) ? envAiWeight : 0.35);\n\n  const totalWeight = (rulesWeightRaw > 0 ? rulesWeightRaw : 0) + (aiWeightRaw > 0 ? aiWeightRaw : 0);\n  const rulesWeight = totalWeight > 0 ? (rulesWeightRaw > 0 ? rulesWeightRaw : 0) / totalWeight : 0.65;\n  const aiWeight = totalWeight > 0 ? (aiWeightRaw > 0 ? aiWeightRaw : 0) / totalWeight : 0.35;\n\n  output.push({\n    json: {\n      ...payload,\n      readinessThreshold,\n      rulesWeight: Number(rulesWeight.toFixed(3)),\n      aiWeight: Number(aiWeight.toFixed(3)),\n      docsWeighting: {\n        oneDoc: 5,\n        threeDocs: 10,\n        fiveDocs: 5,\n      },\n    },\n  });\n}\nreturn output;"
+      },
+      "id": "inject_scoring_config",
+      "name": "Inject Scoring Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const budget = Number(payload.budget || 0);\n  const docsProvided = Number(payload.docsProvided || 0);\n  const timeline = String(payload.timeline || payload.howSoon || '').toLowerCase().trim();\n\n  let budgetScore = 0;\n  if (budget >= 2000) budgetScore += 10;\n  if (budget >= 5000) budgetScore += 15;\n  if (budget >= 10000) budgetScore += 10;\n\n  let docsScore = 0;\n  if (docsProvided >= 1) docsScore += 5;\n  if (docsProvided >= 3) docsScore += 10;\n  if (docsProvided >= 5) docsScore += 5;\n\n  let timelineScore = 0;\n  if (/asap|urgent|immediately|today|this week/.test(timeline)) timelineScore = 20;\n  else if (/next\\s*2\\s*weeks|within\\s*2\\s*weeks|14\\s*days/.test(timeline)) timelineScore = 14;\n  else if (/this month|30\\s*days|next month/.test(timeline)) timelineScore = 8;\n  else if (/exploring|no rush|later|sometime/.test(timeline)) timelineScore = 2;\n\n  const baseScore = 35;\n  const deterministicScore = Math.min(100, baseScore + budgetScore + docsScore + timelineScore);\n  const readinessThreshold = Number(payload.readinessThreshold || 80);\n\n  const fingerprint = [\n    String(payload.email || '').toLowerCase(),\n    String(payload.company || '').toLowerCase(),\n    String(payload.firstName || payload.name || '').toLowerCase(),\n    String(payload.message || '').trim().toLowerCase(),\n  ].join('|');\n  const idempotencyKey = Buffer.from(fingerprint).toString('base64').replace(/=/g, '').slice(0, 64);\n\n  output.push({\n    json: {\n      ...payload,\n      budgetScore,\n      docsScore,\n      timelineScore,\n      deterministicScore,\n      idempotencyKey,\n      readinessByRules: deterministicScore >= readinessThreshold ? 'kickoff_ready' : 'awaiting_documents',\n    },\n  });\n}\nreturn output;"
       },
       "id": "deterministic_readiness",
       "name": "Deterministic Readiness",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        320
+        1310,
+        420
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{'You plan client onboarding. Return strict JSON with keys aiScore (0-100), priority (kickoff_ready|awaiting_documents), summary (string). Intake payload: ' + JSON.stringify($json)}}",
+        "text": "={{'You are a client onboarding triage expert for B2B automation projects. Return ONLY valid JSON with this exact schema: {\"aiScore\": number 0-100, \"priority\": \"kickoff_ready\" | \"awaiting_documents\", \"summary\": string, \"missingFields\": string[], \"confidence\": number 0-1}. Rules: 1) Never return markdown. 2) If uncertain, lower confidence and explain in summary. 3) Keep summary under 220 characters. Example valid output: {\"aiScore\":72,\"priority\":\"awaiting_documents\",\"summary\":\"Strong fit but kickoff should wait for required docs.\",\"missingFields\":[\"scope_doc\"],\"confidence\":0.82}. Intake payload: ' + JSON.stringify($json)}}",
         "options": {}
       },
       "id": "ai_onboarding_agent",
@@ -71,15 +164,19 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        940,
+        1540,
         220
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4.1-mini"
+          "value": "gpt-4o-mini"
         },
         "options": {}
       },
@@ -88,20 +185,20 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        940,
-        520
+        1540,
+        560
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const candidates = [payload.output, payload.text, payload.response, payload.result, payload];\n\n  let parsed = {};\n  let aiParseOk = false;\n\n  for (const candidate of candidates) {\n    if (candidate === undefined || candidate === null) continue;\n\n    if (typeof candidate === 'object') {\n      parsed = candidate;\n      aiParseOk = true;\n      break;\n    }\n\n    if (typeof candidate === 'string') {\n      const trimmed = candidate.trim();\n      if (!trimmed) continue;\n      try {\n        parsed = JSON.parse(trimmed);\n        aiParseOk = true;\n        break;\n      } catch (error) {\n        const match = trimmed.match(/\\{[\\s\\S]*\\}/);\n        if (!match) continue;\n        try {\n          parsed = JSON.parse(match[0]);\n          aiParseOk = true;\n          break;\n        } catch (innerError) {\n          // Continue trying remaining candidates.\n        }\n      }\n    }\n  }\n\n  const aiScoreRaw = Number(parsed.aiScore ?? parsed.score ?? parsed.readinessScore ?? 0);\n  const aiScore = Number.isFinite(aiScoreRaw) ? Math.min(100, Math.max(0, aiScoreRaw)) : 0;\n  const aiPriority = String(parsed.priority || '').toLowerCase();\n  const aiSummary = String(parsed.summary || parsed.rationale || parsed.reason || '').trim();\n  const aiConfidenceRaw = Number(parsed.confidence ?? 0);\n  const aiConfidence = Number.isFinite(aiConfidenceRaw) ? Math.min(1, Math.max(0, aiConfidenceRaw)) : 0;\n\n  output.push({\n    json: {\n      aiParseOk,\n      aiScore,\n      aiPriority,\n      aiSummary: aiSummary || 'deterministic fallback used',\n      aiConfidence,\n      aiPayload: parsed,\n    },\n  });\n}\nreturn output;"
       },
       "id": "parse_ai_output",
       "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
+        1760,
         220
       ]
     },
@@ -114,21 +211,21 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1160,
-        360
+        1760,
+        420
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const readinessScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))\n    : deterministicScore;\n\n  const onboardingStatus = readinessScore >= 80 ? 'kickoff_ready' : 'awaiting_documents';\n\n  return {\n    json: {\n      ...item.json,\n      readinessScore,\n      onboardingStatus,\n      onboardingSummary: item.json.aiSummary || 'deterministic fallback used',\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const deterministicScore = Number(payload.deterministicScore || 0);\n  const aiScore = Number(payload.aiScore || 0);\n  const rulesWeight = Number(payload.rulesWeight || 0.65);\n  const aiWeight = Number(payload.aiWeight || 0.35);\n  const readinessThreshold = Number(payload.readinessThreshold || 80);\n\n  const aiUsable = payload.aiParseOk === true && aiScore > 0;\n  const blendedScore = aiUsable\n    ? Math.round((deterministicScore * rulesWeight) + (aiScore * aiWeight))\n    : deterministicScore;\n\n  const readinessScore = Math.min(100, Math.max(0, blendedScore));\n  const onboardingStatus = readinessScore >= readinessThreshold ? 'kickoff_ready' : 'awaiting_documents';\n\n  output.push({\n    json: {\n      ...payload,\n      readinessScore,\n      onboardingStatus,\n      kickoffReadyFlag: onboardingStatus === 'kickoff_ready' ? 1 : 0,\n      scoringSource: aiUsable ? 'blended_ai_plus_rules' : 'deterministic_rules_only',\n      onboardingSummary: payload.aiSummary || 'deterministic fallback used',\n    },\n  });\n}\nreturn output;"
       },
       "id": "final_onboarding_decision",
       "name": "Final Onboarding Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
-        360
+        1980,
+        420
       ]
     },
     {
@@ -136,9 +233,9 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{$json.readinessScore}}",
+              "value1": "={{$json.kickoffReadyFlag}}",
               "operation": "largerEqual",
-              "value2": 80
+              "value2": 1
             }
           ]
         }
@@ -148,8 +245,21 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1600,
+        2200,
         360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const key = String(payload.idempotencyKey || payload.email || '').trim();\n  if (key && seen.has(key)) continue;\n  if (key) seen.add(key);\n\n  output.push({\n    json: {\n      ...payload,\n      duplicateSuppressed: false,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "dedupe_in_batch",
+      "name": "Dedupe In Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        520
       ]
     },
     {
@@ -158,7 +268,7 @@
         "operation": "create",
         "databaseId": {
           "mode": "url",
-          "value": "https://www.notion.so/00000000000000000000000000000000"
+          "value": "={{$env.ONBOARDING_NOTION_DB_URL || $env.NOTION_DATABASE_URL || \"https://www.notion.so/00000000000000000000000000000000\"}}"
         },
         "title": "={{\"Onboarding: \" + ($json.firstName || $json.name || \"Client\") + \" | \" + ($json.onboardingStatus || \"pending\")}}",
         "simple": true
@@ -168,9 +278,13 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
       "position": [
-        1820,
-        360
-      ]
+        2420,
+        520
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -179,7 +293,7 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
         "text": "={{\"✅ Client kickoff ready: \" + ($json.email || \"unknown\") + \" | score \" + ($json.readinessScore || 0)}}"
@@ -189,9 +303,13 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        180
-      ]
+        2420,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -200,7 +318,7 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
         "text": "={{\"📎 Docs needed before kickoff: \" + ($json.email || \"unknown\") + \" | score \" + ($json.readinessScore || 0)}}"
@@ -210,15 +328,19 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        540
-      ]
+        2420,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "sendTo": "={{$json.email || \"client@example.com\"}}",
+        "sendTo": "={{$json.email || $env.OWNER_EMAIL || \"owner@example.com\"}}",
         "subject": "Your Onboarding Status",
         "message": "={{\"Status: \" + ($json.onboardingStatus || \"pending\") + \"\\nSummary: \" + ($json.onboardingSummary || \"N/A\")}}"
       },
@@ -227,9 +349,13 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2050,
-        360
-      ]
+        2640,
+        520
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -245,6 +371,51 @@
       ]
     },
     "Normalize Intake": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Intake Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intake Valid?": {
+      "main": [
+        [
+          {
+            "node": "Inject Scoring Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Invalid Intake",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Invalid Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Scoring Config": {
       "main": [
         [
           {
@@ -325,6 +496,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Dedupe In Batch",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -335,11 +513,6 @@
             "node": "Slack Kickoff Ready",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Notion Onboarding Record",
-            "type": "main",
-            "index": 0
           }
         ],
         [
@@ -347,7 +520,13 @@
             "node": "Slack Docs Needed",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Dedupe In Batch": {
+      "main": [
+        [
           {
             "node": "Notion Onboarding Record",
             "type": "main",

@@ -39,14 +39,18 @@
       "position": [
         470,
         320
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const daysInStage = Number(item.json.daysInStage || item.json.stageAgeDays || 18);\n  const amount = Number(item.json.amount || item.json.dealValue || 12000);\n\n  let deterministicScore = 30;\n  if (daysInStage > 14) deterministicScore += 25;\n  if (daysInStage > 30) deterministicScore += 20;\n  if (amount >= 10000) deterministicScore += 15;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore,\n      daysInStage,\n      amount,\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nconst parseDate = (value) => {\n  if (value === undefined || value === null || value === '') return null;\n  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();\n\n  if (typeof value === 'number' && Number.isFinite(value)) {\n    const ms = value > 1e12 ? value : value > 1e9 ? value * 1000 : value;\n    const date = new Date(ms);\n    return Number.isNaN(date.getTime()) ? null : date.toISOString();\n  }\n\n  if (typeof value === 'string') {\n    const trimmed = value.trim();\n    if (!trimmed) return null;\n    const numeric = Number(trimmed);\n    if (Number.isFinite(numeric)) return parseDate(numeric);\n    const date = new Date(trimmed);\n    return Number.isNaN(date.getTime()) ? null : date.toISOString();\n  }\n\n  return null;\n};\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const properties = payload.properties && typeof payload.properties === 'object' ? payload.properties : {};\n\n  const getFirst = (...values) => {\n    for (const value of values) {\n      if (value === undefined || value === null || value === '') continue;\n      return value;\n    }\n    return null;\n  };\n\n  const dealId = String(\n    getFirst(\n      payload.dealId,\n      payload.id,\n      payload.hs_object_id,\n      properties.hs_object_id,\n      properties.dealId,\n      properties.deal_id,\n    ) || ''\n  ).trim();\n\n  const dealName = String(\n    getFirst(\n      payload.dealName,\n      payload.name,\n      payload.dealname,\n      properties.dealname,\n      properties.name,\n    ) || ''\n  ).trim();\n\n  const stage = String(\n    getFirst(\n      payload.dealStage,\n      payload.stage,\n      payload.pipelineStage,\n      properties.dealstage,\n      properties.pipeline_stage,\n      properties.stage,\n    ) || 'unknown'\n  ).trim();\n\n  const amountRaw = Number(\n    getFirst(\n      payload.amount,\n      payload.dealValue,\n      payload.value,\n      properties.amount,\n      properties.dealvalue,\n      properties.value,\n      0,\n    )\n  );\n  const amount = Number.isFinite(amountRaw) ? amountRaw : 0;\n\n  const daysInStageRaw = Number(\n    getFirst(\n      payload.daysInStage,\n      payload.stageAgeDays,\n      properties.daysInStage,\n      properties.stageAgeDays,\n      properties.stage_age_days,\n      0,\n    )\n  );\n  const daysInStage = Number.isFinite(daysInStageRaw) ? Math.max(0, daysInStageRaw) : 0;\n\n  const closeDate = parseDate(\n    getFirst(\n      payload.closeDate,\n      payload.expectedCloseDate,\n      properties.closedate,\n      properties.closeDate,\n    )\n  );\n\n  const lastActivityDate = parseDate(\n    getFirst(\n      payload.lastActivityDate,\n      payload.lastActivityAt,\n      properties.hs_lastactivitydate,\n      properties.lastactivitydate,\n      properties.lastActivityDate,\n    )\n  );\n\n  const lastModifiedDate = parseDate(\n    getFirst(\n      payload.hs_lastmodifieddate,\n      payload.lastModifiedDate,\n      payload.updatedAt,\n      properties.hs_lastmodifieddate,\n      properties.lastmodifieddate,\n      properties.updatedAt,\n    )\n  );\n\n  const ownerId = String(\n    getFirst(\n      payload.ownerId,\n      payload.hubspotOwnerId,\n      properties.hubspot_owner_id,\n      properties.ownerId,\n    ) || ''\n  ).trim();\n\n  const contactEmail = String(\n    getFirst(\n      payload.email,\n      payload.contactEmail,\n      properties.email,\n      properties.contact_email,\n      '',\n    )\n  ).trim().toLowerCase();\n\n  output.push({\n    json: {\n      ...payload,\n      dealId,\n      dealName: dealName || (dealId ? 'Deal ' + dealId : 'Unnamed deal'),\n      stage,\n      amount,\n      daysInStage,\n      closeDate,\n      lastActivityDate,\n      lastModifiedDate,\n      ownerId,\n      contactEmail,\n      normalizedAt: new Date().toISOString(),\n    },\n  });\n}\n\nreturn output;"
       },
-      "id": "deterministic_deal_risk",
-      "name": "Deterministic Deal Risk",
+      "id": "normalize_deal_fields",
+      "name": "Normalize Deal Fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -56,8 +60,47 @@
     },
     {
       "parameters": {
+        "jsCode": "const output = [];\nconst nowMs = Date.now();\n\nconst parseDateMs = (value) => {\n  if (value === undefined || value === null || value === '') return null;\n  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();\n\n  if (typeof value === 'number' && Number.isFinite(value)) {\n    return value > 1e12 ? value : value > 1e9 ? value * 1000 : value;\n  }\n\n  if (typeof value === 'string') {\n    const trimmed = value.trim();\n    if (!trimmed) return null;\n    const numeric = Number(trimmed);\n    if (Number.isFinite(numeric)) return parseDateMs(numeric);\n    const parsed = Date.parse(trimmed);\n    return Number.isNaN(parsed) ? null : parsed;\n  }\n\n  return null;\n};\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n\n  const envLookback = Number(process.env.N8N_REVOPS_LOOKBACK_HOURS || 6);\n  const payloadLookback = Number(payload.lookbackHours);\n  const lookbackHours = Number.isFinite(payloadLookback)\n    ? payloadLookback\n    : (Number.isFinite(envLookback) ? envLookback : 6);\n\n  const allowUnknownModified = String(process.env.N8N_REVOPS_PROCESS_UNKNOWN_MODIFIED || 'false').toLowerCase() === 'true';\n  const lastModifiedMs = parseDateMs(payload.lastModifiedDate);\n  const withinWindow = Number.isFinite(lastModifiedMs)\n    ? Math.abs(nowMs - lastModifiedMs) <= lookbackHours * 60 * 60 * 1000\n    : allowUnknownModified;\n\n  if (!withinWindow) continue;\n\n  output.push({\n    json: {\n      ...payload,\n      lookbackHours,\n      withinLookbackWindow: true,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "filter_recent_deal_changes",
+      "name": "Filter Recent Deal Changes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        930,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n\n  const envAtRisk = Number(process.env.N8N_REVOPS_AT_RISK_THRESHOLD || 80);\n  const envWarning = Number(process.env.N8N_REVOPS_WARNING_THRESHOLD || 60);\n  const envRulesWeight = Number(process.env.N8N_REVOPS_RULES_WEIGHT || 0.65);\n  const envAiWeight = Number(process.env.N8N_REVOPS_AI_WEIGHT || 0.35);\n\n  const atRiskRaw = Number.isFinite(Number(payload.atRiskThreshold))\n    ? Number(payload.atRiskThreshold)\n    : (Number.isFinite(envAtRisk) ? envAtRisk : 80);\n  const atRiskThreshold = Math.min(100, Math.max(1, atRiskRaw));\n\n  const warningRaw = Number.isFinite(Number(payload.warningThreshold))\n    ? Number(payload.warningThreshold)\n    : (Number.isFinite(envWarning) ? envWarning : 60);\n  const warningThreshold = Math.min(atRiskThreshold - 1, Math.min(99, Math.max(0, warningRaw)));\n\n  const rulesWeightRaw = Number.isFinite(Number(payload.rulesWeight))\n    ? Number(payload.rulesWeight)\n    : (Number.isFinite(envRulesWeight) ? envRulesWeight : 0.65);\n  const aiWeightRaw = Number.isFinite(Number(payload.aiWeight))\n    ? Number(payload.aiWeight)\n    : (Number.isFinite(envAiWeight) ? envAiWeight : 0.35);\n\n  const totalWeight = (rulesWeightRaw > 0 ? rulesWeightRaw : 0) + (aiWeightRaw > 0 ? aiWeightRaw : 0);\n  const rulesWeight = totalWeight > 0 ? (rulesWeightRaw > 0 ? rulesWeightRaw : 0) / totalWeight : 0.65;\n  const aiWeight = totalWeight > 0 ? (aiWeightRaw > 0 ? aiWeightRaw : 0) / totalWeight : 0.35;\n\n  output.push({\n    json: {\n      ...payload,\n      atRiskThreshold,\n      warningThreshold,\n      rulesWeight: Number(rulesWeight.toFixed(3)),\n      aiWeight: Number(aiWeight.toFixed(3)),\n      ownerEmail: String(payload.ownerEmail || process.env.OWNER_EMAIL || 'owner@example.com').trim(),\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "inject_revops_config",
+      "name": "Inject RevOps Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const nowMs = Date.now();\n\n  const daysInStage = Number(payload.daysInStage || payload.stageAgeDays || 0);\n  const amount = Number(payload.amount || payload.dealValue || 0);\n\n  let stageAgingScore = 0;\n  if (daysInStage > 14) stageAgingScore += 18;\n  if (daysInStage > 30) stageAgingScore += 20;\n  if (daysInStage > 45) stageAgingScore += 10;\n\n  let amountRiskScore = 0;\n  if (amount >= 10000) amountRiskScore += 10;\n  if (amount >= 25000) amountRiskScore += 8;\n  if (amount >= 50000) amountRiskScore += 6;\n\n  let inactivityScore = 0;\n  if (payload.lastActivityDate) {\n    const activityMs = Date.parse(String(payload.lastActivityDate));\n    if (!Number.isNaN(activityMs)) {\n      const inactiveDays = Math.floor((nowMs - activityMs) / (1000 * 60 * 60 * 24));\n      if (inactiveDays > 7) inactivityScore += 8;\n      if (inactiveDays > 14) inactivityScore += 10;\n      if (inactiveDays > 30) inactivityScore += 8;\n    }\n  }\n\n  let closeDatePressureScore = 0;\n  if (payload.closeDate) {\n    const closeMs = Date.parse(String(payload.closeDate));\n    if (!Number.isNaN(closeMs)) {\n      const daysToClose = Math.floor((closeMs - nowMs) / (1000 * 60 * 60 * 24));\n      if (daysToClose < 0) closeDatePressureScore += 12;\n      else if (daysToClose <= 14) closeDatePressureScore += 6;\n    }\n  }\n\n  const baseScore = 20;\n  const deterministicScore = Math.min(100, baseScore + stageAgingScore + amountRiskScore + inactivityScore + closeDatePressureScore);\n  const atRiskThreshold = Number(payload.atRiskThreshold || 80);\n  const warningThreshold = Number(payload.warningThreshold || 60);\n\n  const deterministicPriority = deterministicScore >= atRiskThreshold\n    ? 'at_risk'\n    : (deterministicScore >= warningThreshold ? 'warning' : 'healthy');\n\n  const dedupeFingerprint = [\n    String(payload.dealId || ''),\n    String(payload.lastModifiedDate || ''),\n    deterministicPriority,\n  ].join('|');\n  const idempotencyKey = Buffer.from(dedupeFingerprint).toString('base64').replace(/=/g, '').slice(0, 64);\n\n  output.push({\n    json: {\n      ...payload,\n      stageAgingScore,\n      amountRiskScore,\n      inactivityScore,\n      closeDatePressureScore,\n      deterministicScore,\n      deterministicPriority,\n      idempotencyKey,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "deterministic_deal_risk",
+      "name": "Deterministic Deal Risk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1390,
+        420
+      ]
+    },
+    {
+      "parameters": {
         "promptType": "define",
-        "text": "={{'You assess revenue pipeline slippage. Return strict JSON with keys aiScore (0-100), priority (at_risk|healthy), summary (string). Deal payload: ' + JSON.stringify($json)}}",
+        "text": "={{'Analyze this deal for pipeline risk. Consider: days in current stage, deal value, last contact activity, expected close date pressure, and stage progression risk. Return ONLY valid JSON (no markdown) with this exact schema: {\"aiScore\": number 0-100, \"priority\": \"at_risk\" | \"warning\" | \"healthy\", \"summary\": string, \"confidence\": number 0-1}. Keep summary under 220 characters. Deal payload: ' + JSON.stringify($json)}}",
         "options": {}
       },
       "id": "ai_deal_risk_agent",
@@ -65,15 +108,19 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        940,
+        1620,
         220
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4.1-mini"
+          "value": "gpt-4o-mini"
         },
         "options": {}
       },
@@ -82,20 +129,20 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        940,
-        520
+        1620,
+        560
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const candidates = [payload.output, payload.text, payload.response, payload.result, payload];\n\n  let parsed = {};\n  let aiParseOk = false;\n\n  for (const candidate of candidates) {\n    if (candidate === undefined || candidate === null) continue;\n\n    if (typeof candidate === 'object') {\n      parsed = candidate;\n      aiParseOk = true;\n      break;\n    }\n\n    if (typeof candidate === 'string') {\n      const trimmed = candidate.trim();\n      if (!trimmed) continue;\n      try {\n        parsed = JSON.parse(trimmed);\n        aiParseOk = true;\n        break;\n      } catch (error) {\n        const match = trimmed.match(/\\{[\\s\\S]*\\}/);\n        if (!match) continue;\n        try {\n          parsed = JSON.parse(match[0]);\n          aiParseOk = true;\n          break;\n        } catch (innerError) {\n          // Continue trying remaining candidates.\n        }\n      }\n    }\n  }\n\n  const aiScoreRaw = Number(parsed.aiScore ?? parsed.score ?? parsed.riskScore ?? 0);\n  const aiScore = Number.isFinite(aiScoreRaw) ? Math.min(100, Math.max(0, aiScoreRaw)) : 0;\n\n  let aiPriority = String(parsed.priority || parsed.health || '').toLowerCase().trim();\n  if (!['at_risk', 'warning', 'healthy'].includes(aiPriority)) {\n    const atRiskThreshold = Number(payload.atRiskThreshold || 80);\n    const warningThreshold = Number(payload.warningThreshold || 60);\n    aiPriority = aiScore >= atRiskThreshold ? 'at_risk' : (aiScore >= warningThreshold ? 'warning' : 'healthy');\n  }\n\n  const aiSummary = String(parsed.summary || parsed.rationale || parsed.reason || '').trim();\n  const aiConfidenceRaw = Number(parsed.confidence ?? 0);\n  const aiConfidence = Number.isFinite(aiConfidenceRaw) ? Math.min(1, Math.max(0, aiConfidenceRaw)) : 0;\n\n  output.push({\n    json: {\n      aiParseOk,\n      aiScore,\n      aiPriority,\n      aiSummary: aiSummary || 'deterministic fallback used',\n      aiConfidence,\n      aiPayload: parsed,\n    },\n  });\n}\n\nreturn output;"
       },
       "id": "parse_ai_output",
       "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
+        1840,
         220
       ]
     },
@@ -108,37 +155,21 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1160,
-        360
+        1840,
+        420
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const dealRiskScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))\n    : deterministicScore;\n\n  const health = dealRiskScore >= 70 ? 'at_risk' : 'healthy';\n\n  return {\n    json: {\n      ...item.json,\n      dealRiskScore,\n      health,\n      riskSummary: item.json.aiSummary || 'deterministic fallback used',\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const deterministicScore = Number(payload.deterministicScore || 0);\n  const aiScore = Number(payload.aiScore || 0);\n  const rulesWeight = Number(payload.rulesWeight || 0.65);\n  const aiWeight = Number(payload.aiWeight || 0.35);\n  const atRiskThreshold = Number(payload.atRiskThreshold || 80);\n  const warningThreshold = Number(payload.warningThreshold || 60);\n\n  const aiUsable = payload.aiParseOk === true && aiScore > 0;\n  const blendedScore = aiUsable\n    ? Math.round((deterministicScore * rulesWeight) + (aiScore * aiWeight))\n    : deterministicScore;\n  const dealRiskScore = Math.min(100, Math.max(0, blendedScore));\n\n  const health = dealRiskScore >= atRiskThreshold\n    ? 'at_risk'\n    : (dealRiskScore >= warningThreshold ? 'warning' : 'healthy');\n\n  output.push({\n    json: {\n      ...payload,\n      dealRiskScore,\n      health,\n      atRiskFlag: health === 'at_risk' ? 1 : 0,\n      needsAttentionFlag: health === 'healthy' ? 0 : 1,\n      scoringSource: aiUsable ? 'blended_ai_plus_rules' : 'deterministic_rules_only',\n      riskSummary: payload.aiSummary || 'deterministic fallback used',\n    },\n  });\n}\n\nreturn output;"
       },
       "id": "final_deal_decision",
       "name": "Final Deal Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
-        360
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "contact",
-        "operation": "upsert",
-        "email": "={{\"owner@example.com\"}}",
-        "additionalFields": {}
-      },
-      "id": "hubspot_sync_owner_contact",
-      "name": "HubSpot Sync Owner Contact",
-      "type": "n8n-nodes-base.hubspot",
-      "typeVersion": 2.2,
-      "position": [
-        1600,
-        480
+        2060,
+        420
       ]
     },
     {
@@ -146,20 +177,58 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{$json.dealRiskScore}}",
+              "value1": "={{$json.needsAttentionFlag}}",
               "operation": "largerEqual",
-              "value2": 70
+              "value2": 1
             }
           ]
         }
       },
-      "id": "at_risk_check",
-      "name": "At Risk Deal?",
+      "id": "needs_attention_check",
+      "name": "Needs Attention?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1600,
-        320
+        2280,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{($json.health === \"at_risk\" ? \"🚨\" : \"⚠️\") + \" Deal risk \" + ($json.health || \"unknown\") + \": \" + ($json.dealName || $json.dealId || \"Unnamed\") + \" | score \" + ($json.dealRiskScore || 0) + \" | stage \" + ($json.stage || \"unknown\")}}"
+      },
+      "id": "slack_risk_alert",
+      "name": "Slack Risk Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2500,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const key = String(payload.idempotencyKey || payload.dealId || '').trim();\n  if (key && seen.has(key)) continue;\n  if (key) seen.add(key);\n\n  output.push({\n    json: {\n      ...payload,\n      duplicateSuppressed: false,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "dedupe_deal_record",
+      "name": "Dedupe Deal Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        420
       ]
     },
     {
@@ -168,9 +237,9 @@
         "operation": "create",
         "databaseId": {
           "mode": "url",
-          "value": "https://www.notion.so/00000000000000000000000000000000"
+          "value": "={{$env.REVOPS_NOTION_DB_URL || $env.NOTION_DATABASE_URL || \"https://www.notion.so/00000000000000000000000000000000\"}}"
         },
-        "title": "={{\"RevOps: \" + ($json.health || \"healthy\") + \" | score \" + ($json.dealRiskScore || 0)}}",
+        "title": "={{\"RevOps: \" + ($json.health || \"healthy\") + \" | \" + ($json.dealName || $json.dealId || \"Unknown\") + \" | score \" + ($json.dealRiskScore || 0)}}",
         "simple": true
       },
       "id": "notion_revops_log",
@@ -178,68 +247,68 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
       "position": [
-        1820,
-        360
+        2720,
+        420
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst maxRowsEnv = Number(process.env.N8N_REVOPS_DIGEST_MAX_ROWS || 40);\nconst maxRows = Number.isFinite(maxRowsEnv) ? Math.max(5, Math.min(200, maxRowsEnv)) : 40;\n\nconst lines = [];\nlet ownerEmail = 'owner@example.com';\nlet atRiskCount = 0;\nlet warningCount = 0;\n\nfor (const item of items) {\n  const payload = item.json || {};\n  ownerEmail = String(payload.ownerEmail || process.env.OWNER_EMAIL || ownerEmail).trim() || ownerEmail;\n  if (payload.health === 'at_risk') atRiskCount += 1;\n  if (payload.health === 'warning') warningCount += 1;\n  if (payload.health === 'healthy') continue;\n\n  const line = [\n    payload.health === 'at_risk' ? 'AT_RISK' : 'WARNING',\n    payload.dealName || payload.dealId || 'Unnamed deal',\n    'score ' + Number(payload.dealRiskScore || 0),\n    'stage ' + (payload.stage || 'unknown'),\n    payload.riskSummary || 'No summary',\n  ].join(' | ');\n\n  lines.push(line);\n}\n\nconst digestCount = lines.length;\nconst limitedLines = lines.slice(0, maxRows);\nconst overflow = digestCount > limitedLines.length ? '\\n...and ' + (digestCount - limitedLines.length) + ' more deals.' : '';\n\nconst digestSubject = digestCount > 0\n  ? 'RevOps Risk Digest: ' + atRiskCount + ' at-risk, ' + warningCount + ' warning'\n  : 'RevOps Risk Digest: No at-risk deals';\n\nconst digestBody = digestCount > 0\n  ? [\n      'Run time: ' + new Date().toISOString(),\n      'Deals requiring attention: ' + digestCount,\n      '',\n      limitedLines.map((line) => '- ' + line).join('\\n'),\n      overflow,\n    ].join('\\n')\n  : [\n      'Run time: ' + new Date().toISOString(),\n      'No at-risk or warning deals were detected in this run.',\n    ].join('\\n');\n\nreturn [{\n  json: {\n    digestCount,\n    atRiskCount,\n    warningCount,\n    ownerEmail,\n    digestSubject,\n    digestBody,\n  },\n}];"
+      },
+      "id": "build_revops_digest",
+      "name": "Build RevOps Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        420
       ]
     },
     {
       "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "select": "channel",
-        "channelId": {
-          "mode": "id",
-          "value": "C01234567"
-        },
-        "messageType": "text",
-        "text": "={{\"🚨 At-risk deal detected | score \" + ($json.dealRiskScore || 0) + \" | days \" + ($json.daysInStage || 0)}}"
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.digestCount}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
       },
-      "id": "slack_at_risk_alert",
-      "name": "Slack At Risk Alert",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.4,
+      "id": "digest_has_alerts",
+      "name": "Digest Has Alerts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
       "position": [
-        1820,
-        180
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "select": "channel",
-        "channelId": {
-          "mode": "id",
-          "value": "C01234567"
-        },
-        "messageType": "text",
-        "text": "={{\"✅ Deal health normal | score \" + ($json.dealRiskScore || 0)}}"
-      },
-      "id": "slack_healthy_update",
-      "name": "Slack Healthy Update",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.4,
-      "position": [
-        1820,
-        540
+        3160,
+        420
       ]
     },
     {
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "sendTo": "={{\"owner@example.com\"}}",
-        "subject": "RevOps Deal Health Summary",
-        "message": "={{\"Health: \" + ($json.health || \"healthy\") + \"\\nScore: \" + ($json.dealRiskScore || 0) + \"\\nSummary: \" + ($json.riskSummary || \"N/A\")}}"
+        "sendTo": "={{$json.ownerEmail || $env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "={{$json.digestSubject || \"RevOps Risk Digest\"}}",
+        "message": "={{$json.digestBody || \"No digest content.\"}}"
       },
-      "id": "gmail_revops_summary",
-      "name": "Gmail RevOps Summary",
+      "id": "gmail_revops_digest",
+      "name": "Gmail RevOps Digest",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2050,
+        3380,
         360
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -255,6 +324,39 @@
       ]
     },
     "HubSpot Search Deals": {
+      "main": [
+        [
+          {
+            "node": "Normalize Deal Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Deal Fields": {
+      "main": [
+        [
+          {
+            "node": "Filter Recent Deal Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Recent Deal Changes": {
+      "main": [
+        [
+          {
+            "node": "Inject RevOps Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject RevOps Config": {
       "main": [
         [
           {
@@ -331,38 +433,39 @@
       "main": [
         [
           {
-            "node": "At Risk Deal?",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "HubSpot Sync Owner Contact",
+            "node": "Needs Attention?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "At Risk Deal?": {
+    "Needs Attention?": {
       "main": [
         [
           {
-            "node": "Slack At Risk Alert",
+            "node": "Slack Risk Alert",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Notion RevOps Log",
+            "node": "Dedupe Deal Record",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Slack Healthy Update",
+            "node": "Dedupe Deal Record",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Dedupe Deal Record": {
+      "main": [
+        [
           {
             "node": "Notion RevOps Log",
             "type": "main",
@@ -375,11 +478,34 @@
       "main": [
         [
           {
-            "node": "Gmail RevOps Summary",
+            "node": "Build RevOps Digest",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Build RevOps Digest": {
+      "main": [
+        [
+          {
+            "node": "Digest Has Alerts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Digest Has Alerts?": {
+      "main": [
+        [
+          {
+            "node": "Gmail RevOps Digest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   }

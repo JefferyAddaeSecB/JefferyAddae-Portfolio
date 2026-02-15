@@ -49,21 +49,114 @@
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const urgency = String(item.json.urgency || 'normal').toLowerCase();\n  const source = String(item.json.source || 'unknown').toLowerCase();\n\n  let deterministicScore = 35;\n  if (budget >= 5000) deterministicScore += 25;\n  if (budget >= 12000) deterministicScore += 10;\n  if (urgency.includes('high') || urgency.includes('urgent')) deterministicScore += 15;\n  if (source.includes('referral')) deterministicScore += 10;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore: Math.min(deterministicScore, 100),\n      deterministicPriority: deterministicScore >= 75 ? 'hot' : deterministicScore >= 55 ? 'warm' : 'cold',\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const errors = [];\n\n  const firstName = String(payload.firstName || payload.name || '').trim();\n  const email = String(payload.email || '').trim().toLowerCase();\n  const message = String(payload.message || payload.details || payload.description || '').trim();\n  const budget = Number(payload.budget || 0);\n  const urgency = String(payload.urgency || payload.timeline || '').toLowerCase().trim();\n  const source = String(payload.source || '').toLowerCase().trim();\n\n  if (!firstName) errors.push('first_name_missing');\n  if (!email) errors.push('email_missing');\n  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('email_invalid');\n  if (!message) errors.push('message_missing');\n\n  output.push({\n    json: {\n      ...payload,\n      firstName,\n      email,\n      message,\n      budget,\n      urgency,\n      source,\n      isValidLead: errors.length === 0 ? 1 : 0,\n      validationErrors: errors,\n    },\n  });\n}\nreturn output;"
+      },
+      "id": "validate_lead_payload",
+      "name": "Validate Lead Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.isValidLead}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "lead_valid_check",
+      "name": "Lead Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{\"⚠️ Invalid lead blocked: \" + ($json.email || \"unknown\") + \" | errors \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "slack_invalid_lead",
+      "name": "Slack Invalid Lead",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1080,
+        180
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Invalid Lead Payload",
+        "message": "={{\"Blocked lead for \" + ($json.email || \"unknown\") + \"\\nErrors: \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "gmail_invalid_lead",
+      "name": "Gmail Invalid Lead",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1080,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n\n  const envHotThreshold = Number(process.env.N8N_LEAD_HOT_THRESHOLD || 75);\n  const envWarmThreshold = Number(process.env.N8N_LEAD_WARM_THRESHOLD || 55);\n  const envRulesWeight = Number(process.env.N8N_LEAD_RULES_WEIGHT || 0.65);\n  const envAiWeight = Number(process.env.N8N_LEAD_AI_WEIGHT || 0.35);\n\n  const hotBase = Number.isFinite(Number(payload.hotThreshold))\n    ? Number(payload.hotThreshold)\n    : (Number.isFinite(envHotThreshold) ? envHotThreshold : 75);\n  const hotThreshold = Math.min(100, Math.max(1, hotBase));\n\n  const warmBase = Number.isFinite(Number(payload.warmThreshold))\n    ? Number(payload.warmThreshold)\n    : (Number.isFinite(envWarmThreshold) ? envWarmThreshold : 55);\n  const warmThreshold = Math.min(hotThreshold - 1, Math.min(99, Math.max(0, warmBase)));\n\n  const rulesWeightRaw = Number.isFinite(Number(payload.rulesWeight))\n    ? Number(payload.rulesWeight)\n    : (Number.isFinite(envRulesWeight) ? envRulesWeight : 0.65);\n  const aiWeightRaw = Number.isFinite(Number(payload.aiWeight))\n    ? Number(payload.aiWeight)\n    : (Number.isFinite(envAiWeight) ? envAiWeight : 0.35);\n\n  const weightTotal = (rulesWeightRaw > 0 ? rulesWeightRaw : 0) + (aiWeightRaw > 0 ? aiWeightRaw : 0);\n  const rulesWeight = weightTotal > 0 ? (rulesWeightRaw > 0 ? rulesWeightRaw : 0) / weightTotal : 0.65;\n  const aiWeight = weightTotal > 0 ? (aiWeightRaw > 0 ? aiWeightRaw : 0) / weightTotal : 0.35;\n\n  output.push({\n    json: {\n      ...payload,\n      hotThreshold,\n      warmThreshold,\n      rulesWeight: Number(rulesWeight.toFixed(3)),\n      aiWeight: Number(aiWeight.toFixed(3)),\n    },\n  });\n}\nreturn output;"
+      },
+      "id": "inject_lead_config",
+      "name": "Inject Lead Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const budget = Number(payload.budget || 0);\n  const urgency = String(payload.urgency || payload.timeline || '').toLowerCase().trim();\n  const source = String(payload.source || 'unknown').toLowerCase().trim();\n  const role = String(payload.role || payload.title || '').toLowerCase().trim();\n  const companySize = Number(payload.companySize || payload.employeeCount || 0);\n\n  let budgetScore = 0;\n  if (budget >= 2000) budgetScore += 8;\n  if (budget >= 5000) budgetScore += 12;\n  if (budget >= 12000) budgetScore += 12;\n  if (budget >= 25000) budgetScore += 8;\n\n  let urgencyScore = 0;\n  if (/high|urgent|asap|immediately|this week/.test(urgency)) urgencyScore = 20;\n  else if (/soon|this month|next 2 weeks|14 days/.test(urgency)) urgencyScore = 12;\n  else if (/exploring|later|no rush/.test(urgency)) urgencyScore = 4;\n\n  let sourceScore = 0;\n  if (/referral|partner/.test(source)) sourceScore = 10;\n  else if (/inbound|organic|website/.test(source)) sourceScore = 6;\n  else sourceScore = 3;\n\n  let authorityScore = 0;\n  if (/owner|founder|ceo|coo|director|head|manager/.test(role)) authorityScore = 8;\n  if (companySize >= 20) authorityScore += 4;\n\n  const baseScore = 20;\n  const deterministicScore = Math.min(100, baseScore + budgetScore + urgencyScore + sourceScore + authorityScore);\n  const hotThreshold = Number(payload.hotThreshold || 75);\n  const warmThreshold = Number(payload.warmThreshold || 55);\n\n  const deterministicPriority = deterministicScore >= hotThreshold\n    ? 'hot'\n    : (deterministicScore >= warmThreshold ? 'warm' : 'cold');\n\n  const fingerprint = [\n    String(payload.email || '').toLowerCase(),\n    String(payload.company || '').toLowerCase(),\n    String(payload.firstName || payload.name || '').toLowerCase(),\n    String(payload.message || '').trim().toLowerCase(),\n  ].join('|');\n  const idempotencyKey = Buffer.from(fingerprint).toString('base64').replace(/=/g, '').slice(0, 64);\n\n  output.push({\n    json: {\n      ...payload,\n      budgetScore,\n      urgencyScore,\n      sourceScore,\n      authorityScore,\n      deterministicScore,\n      deterministicPriority,\n      idempotencyKey,\n    },\n  });\n}\nreturn output;"
       },
       "id": "deterministic_lead_scoring",
       "name": "Deterministic Lead Scoring",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        320
+        1310,
+        420
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{'You are a B2B lead qualification agent. Return strict JSON with keys aiScore (0-100), priority (hot|warm|cold), summary (string). Lead payload: ' + JSON.stringify($json)}}",
+        "text": "={{'Analyze this B2B lead for sales readiness. Respond ONLY with valid JSON (no markdown, no commentary) using this exact schema: {\"aiScore\": number 0-100, \"priority\": \"hot\" | \"warm\" | \"cold\", \"summary\": string, \"confidence\": number 0-1}. Consider: budget size, urgency signals, company fit, decision maker access, and message clarity. Keep summary under 240 characters. Lead payload: ' + JSON.stringify($json)}}",
         "options": {}
       },
       "id": "ai_lead_qualifier",
@@ -71,15 +164,19 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        940,
+        1540,
         220
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4.1-mini"
+          "value": "gpt-4o-mini"
         },
         "options": {}
       },
@@ -88,20 +185,20 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        940,
-        520
+        1540,
+        560
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const candidates = [payload.output, payload.text, payload.response, payload.result, payload];\n\n  let parsed = {};\n  let aiParseOk = false;\n\n  for (const candidate of candidates) {\n    if (candidate === undefined || candidate === null) continue;\n\n    if (typeof candidate === 'object') {\n      parsed = candidate;\n      aiParseOk = true;\n      break;\n    }\n\n    if (typeof candidate === 'string') {\n      const trimmed = candidate.trim();\n      if (!trimmed) continue;\n      try {\n        parsed = JSON.parse(trimmed);\n        aiParseOk = true;\n        break;\n      } catch (error) {\n        const match = trimmed.match(/\\{[\\s\\S]*\\}/);\n        if (!match) continue;\n        try {\n          parsed = JSON.parse(match[0]);\n          aiParseOk = true;\n          break;\n        } catch (innerError) {\n          // Continue trying remaining candidates.\n        }\n      }\n    }\n  }\n\n  const aiScoreRaw = Number(parsed.aiScore ?? parsed.score ?? parsed.leadScore ?? 0);\n  const aiScore = Number.isFinite(aiScoreRaw) ? Math.min(100, Math.max(0, aiScoreRaw)) : 0;\n\n  let aiPriority = String(parsed.priority || '').toLowerCase().trim();\n  if (!['hot', 'warm', 'cold'].includes(aiPriority)) {\n    const hotThreshold = Number(payload.hotThreshold || 75);\n    const warmThreshold = Number(payload.warmThreshold || 55);\n    aiPriority = aiScore >= hotThreshold ? 'hot' : (aiScore >= warmThreshold ? 'warm' : 'cold');\n  }\n\n  const aiSummary = String(parsed.summary || parsed.rationale || parsed.reason || '').trim();\n  const aiConfidenceRaw = Number(parsed.confidence ?? 0);\n  const aiConfidence = Number.isFinite(aiConfidenceRaw) ? Math.min(1, Math.max(0, aiConfidenceRaw)) : 0;\n\n  output.push({\n    json: {\n      aiParseOk,\n      aiScore,\n      aiPriority,\n      aiSummary: aiSummary || 'deterministic fallback used',\n      aiConfidence,\n      aiPayload: parsed,\n    },\n  });\n}\nreturn output;"
       },
       "id": "parse_ai_output",
       "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
+        1760,
         220
       ]
     },
@@ -114,21 +211,21 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1160,
-        360
+        1760,
+        420
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const leadScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))\n    : deterministicScore;\n\n  const priority = leadScore >= 75 ? 'hot' : leadScore >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      leadScore,\n      priority,\n      aiSummary: item.json.aiSummary || 'deterministic fallback used',\n    },\n  };\n});"
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const deterministicScore = Number(payload.deterministicScore || 0);\n  const aiScore = Number(payload.aiScore || 0);\n  const rulesWeight = Number(payload.rulesWeight || 0.65);\n  const aiWeight = Number(payload.aiWeight || 0.35);\n  const hotThreshold = Number(payload.hotThreshold || 75);\n  const warmThreshold = Number(payload.warmThreshold || 55);\n\n  const aiUsable = payload.aiParseOk === true && aiScore > 0;\n  const blendedScore = aiUsable\n    ? Math.round((deterministicScore * rulesWeight) + (aiScore * aiWeight))\n    : deterministicScore;\n\n  const leadScore = Math.min(100, Math.max(0, blendedScore));\n  const priority = leadScore >= hotThreshold\n    ? 'hot'\n    : (leadScore >= warmThreshold ? 'warm' : 'cold');\n\n  output.push({\n    json: {\n      ...payload,\n      leadScore,\n      priority,\n      hotLeadFlag: priority === 'hot' ? 1 : 0,\n      scoringSource: aiUsable ? 'blended_ai_plus_rules' : 'deterministic_rules_only',\n      aiSummary: payload.aiSummary || 'deterministic fallback used',\n    },\n  });\n}\nreturn output;"
       },
       "id": "final_priority_decision",
       "name": "Final Priority Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
-        360
+        1980,
+        420
       ]
     },
     {
@@ -136,9 +233,9 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{$json.leadScore}}",
+              "value1": "={{$json.hotLeadFlag}}",
               "operation": "largerEqual",
-              "value2": 75
+              "value2": 1
             }
           ]
         }
@@ -148,44 +245,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1600,
+        2200,
         360
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "contact",
-        "operation": "upsert",
-        "email": "={{$json.email || \"lead@example.com\"}}",
-        "additionalFields": {}
-      },
-      "id": "hubspot_upsert_contact",
-      "name": "HubSpot Upsert Contact",
-      "type": "n8n-nodes-base.hubspot",
-      "typeVersion": 2.2,
-      "position": [
-        1820,
-        450
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "databasePage",
-        "operation": "create",
-        "databaseId": {
-          "mode": "url",
-          "value": "https://www.notion.so/00000000000000000000000000000000"
-        },
-        "title": "={{\"Lead: \" + ($json.firstName || $json.name || \"Unknown\") + \" | \" + ($json.priority || \"cold\")}}",
-        "simple": true
-      },
-      "id": "notion_record_lead",
-      "name": "Notion Record Lead",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
-      "position": [
-        1820,
-        320
       ]
     },
     {
@@ -195,7 +256,7 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
         "text": "={{\"🔥 HOT lead: \" + ($json.email || \"no-email\") + \" | score \" + ($json.leadScore || 0)}}"
@@ -205,9 +266,13 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        180
-      ]
+        2420,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -216,7 +281,7 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
         "text": "={{\"New lead: \" + ($json.email || \"no-email\") + \" | priority \" + ($json.priority || \"cold\")}}"
@@ -226,26 +291,91 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        560
-      ]
+        2420,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "sendTo": "={{\"owner@example.com\"}}",
-        "subject": "Lead Qualification Summary",
-        "message": "={{\"Priority: \" + ($json.priority || \"cold\") + \"\\nScore: \" + ($json.leadScore || 0) + \"\\nAI: \" + ($json.aiSummary || \"N/A\")}}"
+        "sendTo": "={{$env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Hot Lead Summary",
+        "message": "={{\"Priority: \" + ($json.priority || \"cold\") + \"\\nScore: \" + ($json.leadScore || 0) + \"\\nLead: \" + ($json.email || \"no-email\") + \"\\nSummary: \" + ($json.aiSummary || \"N/A\")}}"
       },
       "id": "gmail_owner_lead_summary",
       "name": "Gmail Owner Lead Summary",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2050,
-        450
+        2420,
+        540
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const key = String(payload.idempotencyKey || payload.email || '').trim();\n  if (key && seen.has(key)) continue;\n  if (key) seen.add(key);\n\n  output.push({\n    json: {\n      ...payload,\n      duplicateSuppressed: false,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "dedupe_lead_record",
+      "name": "Dedupe Lead Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        360
       ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "={{$env.LEADS_NOTION_DB_URL || $env.NOTION_DATABASE_URL || \"https://www.notion.so/00000000000000000000000000000000\"}}"
+        },
+        "title": "={{\"Lead: \" + ($json.firstName || $json.name || \"Unknown\") + \" | \" + ($json.priority || \"cold\")}}",
+        "simple": true
+      },
+      "id": "notion_record_lead",
+      "name": "Notion Record Lead",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "contact",
+        "operation": "upsert",
+        "email": "={{$json.email || $json.primaryEmail || \"\"}}",
+        "additionalFields": {}
+      },
+      "id": "hubspot_upsert_contact",
+      "name": "HubSpot Upsert Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        3090,
+        360
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -261,6 +391,51 @@
       ]
     },
     "Normalize Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "Lead Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Valid?": {
+      "main": [
+        [
+          {
+            "node": "Inject Lead Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Invalid Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Invalid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Lead Config": {
       "main": [
         [
           {
@@ -353,12 +528,7 @@
             "index": 0
           },
           {
-            "node": "Notion Record Lead",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "HubSpot Upsert Contact",
+            "node": "Gmail Owner Lead Summary",
             "type": "main",
             "index": 0
           }
@@ -368,25 +538,48 @@
             "node": "Slack Standard Lead Alert",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Slack Hot Lead Alert": {
+      "main": [
+        [
           {
-            "node": "Notion Record Lead",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "HubSpot Upsert Contact",
+            "node": "Dedupe Lead Record",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HubSpot Upsert Contact": {
+    "Slack Standard Lead Alert": {
       "main": [
         [
           {
-            "node": "Gmail Owner Lead Summary",
+            "node": "Dedupe Lead Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe Lead Record": {
+      "main": [
+        [
+          {
+            "node": "Notion Record Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Record Lead": {
+      "main": [
+        [
+          {
+            "node": "HubSpot Upsert Contact",
             "type": "main",
             "index": 0
           }

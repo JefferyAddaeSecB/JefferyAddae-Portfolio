@@ -10,7 +10,7 @@
       "parameters": {
         "path": "ops-request-v3",
         "httpMethod": "POST",
-        "responseMode": "onReceived"
+        "responseMode": "lastNode"
       },
       "id": "ops_request_webhook",
       "name": "Ops Request Webhook",
@@ -49,21 +49,114 @@
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const requestType = String(item.json.requestType || 'general').toLowerCase();\n  const priority = String(item.json.priority || 'normal').toLowerCase();\n\n  let deterministicScore = 40;\n  if (priority.includes('high') || priority.includes('urgent')) deterministicScore += 25;\n  if (requestType.includes('finance')) deterministicScore += 15;\n  if (requestType.includes('security')) deterministicScore += 20;\n\n  const approver = requestType.includes('finance')\n    ? 'finance-manager'\n    : requestType.includes('security')\n    ? 'security-lead'\n    : 'ops-manager';\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore,\n      approver,\n      slaHours: deterministicScore >= 75 ? 4 : deterministicScore >= 55 ? 12 : 24,\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const errors = [];\n\n  const firstName = String(payload.firstName || payload.name || '').trim();\n  const email = String(payload.email || payload.requesterEmail || '').trim().toLowerCase();\n  const requestTypeRaw = String(payload.requestType || payload.type || 'general').trim().toLowerCase();\n  const priorityRaw = String(payload.priority || payload.urgency || 'normal').trim().toLowerCase();\n  const details = String(payload.details || payload.message || payload.description || '').trim();\n  const allowedDomain = String(process.env.N8N_OPS_ALLOWED_EMAIL_DOMAIN || '').trim().toLowerCase();\n\n  if (!firstName) errors.push('first_name_missing');\n  if (!email) errors.push('email_missing');\n  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('email_invalid');\n  if (allowedDomain && email && !email.endsWith('@' + allowedDomain)) errors.push('email_domain_not_allowed');\n  if (!details) errors.push('details_missing');\n\n  const fingerprint = [\n    email,\n    requestTypeRaw,\n    priorityRaw,\n    details.toLowerCase(),\n  ].join('|');\n\n  const requestId = String(payload.requestId || payload.id || '').trim() ||\n    Buffer.from(fingerprint).toString('base64').replace(/=/g, '').slice(0, 64);\n\n  output.push({\n    json: {\n      ...payload,\n      firstName,\n      email,\n      requestTypeRaw,\n      priorityRaw,\n      details,\n      requestId,\n      idempotencyKey: requestId,\n      isValidRequest: errors.length === 0 ? 1 : 0,\n      validationErrors: errors,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "validate_ops_request",
+      "name": "Validate Ops Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.isValidRequest}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "request_valid_check",
+      "name": "Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{\"⚠️ Invalid ops request blocked: \" + ($json.email || \"unknown\") + \" | errors \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "slack_invalid_ops_request",
+      "name": "Slack Invalid Ops Request",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1080,
+        180
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Invalid Ops Request Payload",
+        "message": "={{\"Blocked request for \" + ($json.email || \"unknown\") + \"\\nErrors: \" + (($json.validationErrors || []).join(\",\"))}}"
+      },
+      "id": "gmail_invalid_ops_request",
+      "name": "Gmail Invalid Ops Request",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1080,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n\n  const envEscalationThreshold = Number(process.env.N8N_OPS_ESCALATION_THRESHOLD || 70);\n  const envCriticalThreshold = Number(process.env.N8N_OPS_CRITICAL_THRESHOLD || 85);\n  const envRulesWeight = Number(process.env.N8N_OPS_RULES_WEIGHT || 0.7);\n  const envAiWeight = Number(process.env.N8N_OPS_AI_WEIGHT || 0.3);\n\n  const escalationThresholdRaw = Number.isFinite(Number(payload.escalationThreshold))\n    ? Number(payload.escalationThreshold)\n    : (Number.isFinite(envEscalationThreshold) ? envEscalationThreshold : 70);\n  const escalationThreshold = Math.min(100, Math.max(1, escalationThresholdRaw));\n\n  const criticalRaw = Number.isFinite(Number(payload.criticalThreshold))\n    ? Number(payload.criticalThreshold)\n    : (Number.isFinite(envCriticalThreshold) ? envCriticalThreshold : 85);\n  const criticalThreshold = Math.min(100, Math.max(escalationThreshold, criticalRaw));\n\n  const rulesWeightRaw = Number.isFinite(Number(payload.rulesWeight))\n    ? Number(payload.rulesWeight)\n    : (Number.isFinite(envRulesWeight) ? envRulesWeight : 0.7);\n  const aiWeightRaw = Number.isFinite(Number(payload.aiWeight))\n    ? Number(payload.aiWeight)\n    : (Number.isFinite(envAiWeight) ? envAiWeight : 0.3);\n\n  const totalWeight = (rulesWeightRaw > 0 ? rulesWeightRaw : 0) + (aiWeightRaw > 0 ? aiWeightRaw : 0);\n  const rulesWeight = totalWeight > 0 ? (rulesWeightRaw > 0 ? rulesWeightRaw : 0) / totalWeight : 0.7;\n  const aiWeight = totalWeight > 0 ? (aiWeightRaw > 0 ? aiWeightRaw : 0) / totalWeight : 0.3;\n\n  const typeToApprover = {\n    finance: 'finance-manager',\n    security: 'security-lead',\n    legal: 'legal-counsel',\n    it: 'it-admin',\n    hr: 'hr-director',\n    general: 'ops-manager',\n  };\n\n  const approverEmails = {\n    'finance-manager': String(payload.financeApproverEmail || process.env.N8N_APPROVER_FINANCE_EMAIL || '').trim().toLowerCase(),\n    'security-lead': String(payload.securityApproverEmail || process.env.N8N_APPROVER_SECURITY_EMAIL || '').trim().toLowerCase(),\n    'legal-counsel': String(payload.legalApproverEmail || process.env.N8N_APPROVER_LEGAL_EMAIL || '').trim().toLowerCase(),\n    'it-admin': String(payload.itApproverEmail || process.env.N8N_APPROVER_IT_EMAIL || '').trim().toLowerCase(),\n    'hr-director': String(payload.hrApproverEmail || process.env.N8N_APPROVER_HR_EMAIL || '').trim().toLowerCase(),\n    'ops-manager': String(payload.opsApproverEmail || process.env.N8N_APPROVER_OPS_EMAIL || process.env.OWNER_EMAIL || '').trim().toLowerCase(),\n  };\n\n  output.push({\n    json: {\n      ...payload,\n      escalationThreshold,\n      criticalThreshold,\n      rulesWeight: Number(rulesWeight.toFixed(3)),\n      aiWeight: Number(aiWeight.toFixed(3)),\n      ownerEmail: String(payload.ownerEmail || process.env.OWNER_EMAIL || 'owner@example.com').trim(),\n      approvalWebhookBaseUrl: String(payload.approvalWebhookBaseUrl || process.env.N8N_APPROVAL_WEBHOOK_BASE_URL || 'https://example.com/webhook/ops-approval-action-v1').trim(),\n      typeToApprover,\n      approverEmails,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "inject_ops_config",
+      "name": "Inject Ops Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const requestTypeRaw = String(payload.requestTypeRaw || payload.requestType || 'general').toLowerCase().trim();\n  const priorityRaw = String(payload.priorityRaw || payload.priority || 'normal').toLowerCase().trim();\n  const details = String(payload.details || '').toLowerCase();\n  const typeToApprover = payload.typeToApprover || {};\n  const approverEmails = payload.approverEmails || {};\n\n  let requestType = 'general';\n  if (/security|breach|vulnerability|incident/.test(requestTypeRaw)) requestType = 'security';\n  else if (/finance|invoice|billing|payment|expense/.test(requestTypeRaw)) requestType = 'finance';\n  else if (/legal|contract|compliance|regulatory/.test(requestTypeRaw)) requestType = 'legal';\n  else if (/(^|\\W)it(\\W|$)|access|infrastructure|system/.test(requestTypeRaw)) requestType = 'it';\n  else if (/hr|people|hiring|employee/.test(requestTypeRaw)) requestType = 'hr';\n\n  let priorityScore = 0;\n  if (/urgent|critical|p1|sev1/.test(priorityRaw)) priorityScore = 30;\n  else if (/high|asap|today/.test(priorityRaw)) priorityScore = 22;\n  else if (/normal|medium/.test(priorityRaw)) priorityScore = 12;\n  else priorityScore = 6;\n\n  const typeRiskScore = {\n    security: 24,\n    finance: 18,\n    legal: 16,\n    it: 10,\n    hr: 8,\n    general: 6,\n  }[requestType] || 6;\n\n  let crossFunctionalScore = 0;\n  if (/cross[-\\s]?functional|multiple teams|all hands|production/.test(details)) crossFunctionalScore += 12;\n  if (/customer impact|revenue impact|compliance risk/.test(details)) crossFunctionalScore += 10;\n\n  const baseScore = 28;\n  const deterministicScore = Math.min(100, baseScore + priorityScore + typeRiskScore + crossFunctionalScore);\n\n  const approver = typeToApprover[requestType] || 'ops-manager';\n  const approverEmail = String(approverEmails[approver] || '').trim().toLowerCase();\n  const hasApproverEmailFlag = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(approverEmail) ? 1 : 0;\n\n  const baseSlaByType = {\n    security: 4,\n    finance: 8,\n    legal: 12,\n    it: 16,\n    hr: 20,\n    general: 24,\n  };\n  let slaHours = baseSlaByType[requestType] || 24;\n  if (/urgent|critical|p1|sev1|high/.test(priorityRaw)) slaHours = Math.max(2, Math.round(slaHours * 0.5));\n  else if (deterministicScore >= 70) slaHours = Math.max(2, Math.round(slaHours * 0.7));\n\n  const slaDeadlineAt = new Date(Date.now() + (slaHours * 60 * 60 * 1000)).toISOString();\n  const escalationThreshold = Number(payload.escalationThreshold || 70);\n  const statusByRules = deterministicScore >= escalationThreshold ? 'escalation_required' : 'standard_approval';\n\n  output.push({\n    json: {\n      ...payload,\n      requestType,\n      priority: priorityRaw || 'normal',\n      deterministicScore,\n      approver,\n      approverEmail,\n      hasApproverEmailFlag,\n      slaHours,\n      slaDeadlineAt,\n      statusByRules,\n    },\n  });\n}\n\nreturn output;"
       },
       "id": "deterministic_ops_routing",
       "name": "Deterministic Ops Routing",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        320
+        1310,
+        420
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{'You classify internal ops requests for escalation risk. Return strict JSON with keys aiScore (0-100), priority (escalate|standard), summary (string). Request payload: ' + JSON.stringify($json)}}",
+        "text": "={{'You are an internal ops triage agent. HIGH RISK (escalate): security incidents, fraud/compliance violations, legal threats, executive urgency, or cross-functional impact. STANDARD: routine access, standard procurement, normal IT support, general requests. Return ONLY valid JSON with this schema: {\"aiScore\": number 0-100, \"priority\": \"escalate\" | \"standard\", \"summary\": string, \"confidence\": number 0-1}. Keep summary under 220 characters. Request payload: ' + JSON.stringify($json)}}",
         "options": {}
       },
       "id": "ai_ops_risk_agent",
@@ -71,15 +164,19 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        940,
+        1540,
         220
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4.1-mini"
+          "value": "gpt-4o-mini"
         },
         "options": {}
       },
@@ -88,20 +185,20 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        940,
-        520
+        1540,
+        560
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const candidates = [payload.output, payload.text, payload.response, payload.result, payload];\n\n  let parsed = {};\n  let aiParseOk = false;\n\n  for (const candidate of candidates) {\n    if (candidate === undefined || candidate === null) continue;\n\n    if (typeof candidate === 'object') {\n      parsed = candidate;\n      aiParseOk = true;\n      break;\n    }\n\n    if (typeof candidate === 'string') {\n      const trimmed = candidate.trim();\n      if (!trimmed) continue;\n      try {\n        parsed = JSON.parse(trimmed);\n        aiParseOk = true;\n        break;\n      } catch (error) {\n        const match = trimmed.match(/\\{[\\s\\S]*\\}/);\n        if (!match) continue;\n        try {\n          parsed = JSON.parse(match[0]);\n          aiParseOk = true;\n          break;\n        } catch (innerError) {\n          // Continue trying remaining candidates.\n        }\n      }\n    }\n  }\n\n  const aiScoreRaw = Number(parsed.aiScore ?? parsed.score ?? parsed.riskScore ?? 0);\n  const aiScore = Number.isFinite(aiScoreRaw) ? Math.min(100, Math.max(0, aiScoreRaw)) : 0;\n\n  let aiPriority = String(parsed.priority || '').toLowerCase().trim();\n  if (!['escalate', 'standard'].includes(aiPriority)) {\n    const escalationThreshold = Number(payload.escalationThreshold || 70);\n    aiPriority = aiScore >= escalationThreshold ? 'escalate' : 'standard';\n  }\n\n  const aiSummary = String(parsed.summary || parsed.rationale || parsed.reason || '').trim();\n  const aiConfidenceRaw = Number(parsed.confidence ?? 0);\n  const aiConfidence = Number.isFinite(aiConfidenceRaw) ? Math.min(1, Math.max(0, aiConfidenceRaw)) : 0;\n\n  output.push({\n    json: {\n      aiParseOk,\n      aiScore,\n      aiPriority,\n      aiSummary: aiSummary || 'deterministic fallback used',\n      aiConfidence,\n      aiPayload: parsed,\n    },\n  });\n}\n\nreturn output;"
       },
       "id": "parse_ai_output",
       "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
+        1760,
         220
       ]
     },
@@ -114,21 +211,21 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1160,
-        360
+        1760,
+        420
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const escalationScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.7) + (aiScore * 0.3))\n    : deterministicScore;\n\n  const escalate = escalationScore >= 70;\n\n  return {\n    json: {\n      ...item.json,\n      escalationScore,\n      escalate,\n      approvalStatus: escalate ? 'escalation_required' : 'standard_approval',\n    },\n  };\n});"
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const deterministicScore = Number(payload.deterministicScore || 0);\n  const aiScore = Number(payload.aiScore || 0);\n  const rulesWeight = Number(payload.rulesWeight || 0.7);\n  const aiWeight = Number(payload.aiWeight || 0.3);\n  const escalationThreshold = Number(payload.escalationThreshold || 70);\n  const criticalThreshold = Number(payload.criticalThreshold || 85);\n\n  const aiUsable = payload.aiParseOk === true && aiScore > 0;\n  const blendedScore = aiUsable\n    ? Math.round((deterministicScore * rulesWeight) + (aiScore * aiWeight))\n    : deterministicScore;\n  const escalationScore = Math.min(100, Math.max(0, blendedScore));\n\n  const escalate = escalationScore >= escalationThreshold;\n  const isCritical = escalationScore >= criticalThreshold;\n\n  const approvalStatus = escalate ? 'escalation_required' : 'standard_approval';\n  const status = escalate\n    ? (isCritical ? 'awaiting_critical_approval' : 'awaiting_escalated_approval')\n    : 'awaiting_standard_approval';\n\n  const baseApprovalUrl = String(payload.approvalWebhookBaseUrl || process.env.N8N_APPROVAL_WEBHOOK_BASE_URL || '').trim();\n  const requestId = String(payload.requestId || payload.idempotencyKey || '').trim();\n  const requesterEmail = String(payload.email || '').trim().toLowerCase();\n  const approverEmail = String(payload.approverEmail || '').trim().toLowerCase();\n  const ownerEmail = String(payload.ownerEmail || process.env.OWNER_EMAIL || 'owner@example.com').trim();\n\n  const buildApprovalUrl = (action) => {\n    if (!baseApprovalUrl || !requestId) return '';\n    const params = new URLSearchParams({\n      requestId,\n      action,\n      requesterEmail,\n      approverEmail,\n      ownerEmail,\n    });\n    return baseApprovalUrl + (baseApprovalUrl.includes('?') ? '&' : '?') + params.toString();\n  };\n\n  output.push({\n    json: {\n      ...payload,\n      escalationScore,\n      escalate,\n      isCritical,\n      approvalStatus,\n      status,\n      needsEscalationFlag: escalate ? 1 : 0,\n      escalationOwnerFlag: escalate ? 1 : 0,\n      scoringSource: aiUsable ? 'blended_ai_plus_rules' : 'deterministic_rules_only',\n      triageSummary: payload.aiSummary || 'deterministic fallback used',\n      approvalApproveUrl: buildApprovalUrl('approve'),\n      approvalRejectUrl: buildApprovalUrl('reject'),\n    },\n  });\n}\n\nreturn output;"
       },
       "id": "final_ops_decision",
       "name": "Final Ops Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
-        360
+        1980,
+        420
       ]
     },
     {
@@ -136,9 +233,9 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{$json.escalationScore}}",
+              "value1": "={{$json.needsEscalationFlag}}",
               "operation": "largerEqual",
-              "value2": 70
+              "value2": 1
             }
           ]
         }
@@ -148,27 +245,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1600,
-        360
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "databasePage",
-        "operation": "create",
-        "databaseId": {
-          "mode": "url",
-          "value": "https://www.notion.so/00000000000000000000000000000000"
-        },
-        "title": "={{\"Ops Request: \" + ($json.requestType || \"general\") + \" | \" + ($json.approvalStatus || \"standard\")}}",
-        "simple": true
-      },
-      "id": "notion_record_request",
-      "name": "Notion Record Request",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
-      "position": [
-        1820,
+        2200,
         360
       ]
     },
@@ -179,19 +256,23 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
-        "text": "={{\"⚠️ Escalation required for \" + ($json.requestType || \"request\") + \" | score \" + ($json.escalationScore || 0)}}"
+        "text": "={{\"⚠️ Escalation required for \" + ($json.requestType || \"request\") + \" | score \" + ($json.escalationScore || 0) + \" | approver \" + ($json.approver || \"ops-manager\")}}"
       },
       "id": "slack_escalation_alert",
       "name": "Slack Escalation Alert",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        180
-      ]
+        2420,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -200,7 +281,7 @@
         "select": "channel",
         "channelId": {
           "mode": "id",
-          "value": "C01234567"
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
         },
         "messageType": "text",
         "text": "={{\"New ops request assigned to \" + ($json.approver || \"ops-manager\") + \" | SLA \" + ($json.slaHours || 24) + \"h\"}}"
@@ -210,24 +291,90 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1820,
-        540
+        2420,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const key = String(payload.idempotencyKey || payload.requestId || '').trim();\n  if (key && seen.has(key)) continue;\n  if (key) seen.add(key);\n\n  output.push({\n    json: {\n      ...payload,\n      duplicateSuppressed: false,\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "dedupe_ops_request",
+      "name": "Dedupe Ops Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        320
       ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "={{$env.OPS_NOTION_DB_URL || $env.NOTION_DATABASE_URL || \"https://www.notion.so/00000000000000000000000000000000\"}}"
+        },
+        "title": "={{\"Ops Request: \" + ($json.requestType || \"general\") + \" | \" + ($json.status || \"pending\")}}",
+        "simple": true
+      },
+      "id": "notion_record_request",
+      "name": "Notion Record Request",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "sendTo": "={{$json.email || \"requester@example.com\"}}",
+        "sendTo": "={{$json.email || $json.ownerEmail || $env.OWNER_EMAIL || \"owner@example.com\"}}",
         "subject": "Ops Request Status Update",
-        "message": "={{\"Status: \" + ($json.approvalStatus || \"pending\") + \"\\nApprover: \" + ($json.approver || \"ops-manager\") + \"\\nSLA: \" + ($json.slaHours || 24) + \"h\"}}"
+        "message": "={{\"Status: \" + ($json.status || \"pending\") + \"\\nApproval: \" + ($json.approvalStatus || \"pending\") + \"\\nApprover: \" + ($json.approver || \"ops-manager\") + \"\\nSLA: \" + ($json.slaHours || 24) + \"h\\nDeadline: \" + ($json.slaDeadlineAt || \"N/A\") + \"\\nSummary: \" + ($json.triageSummary || \"N/A\")}}"
       },
       "id": "gmail_request_status",
       "name": "Gmail Request Status",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2050,
+        3080,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.hasApproverEmailFlag}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "approver_email_available",
+      "name": "Approver Email Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3080,
         360
       ]
     },
@@ -235,18 +382,209 @@
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "sendTo": "={{\"owner@example.com\"}}",
+        "sendTo": "={{$json.approverEmail || $json.ownerEmail || $env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Approval Needed: Ops Request",
+        "message": "={{\"Request ID: \" + ($json.requestId || \"N/A\") + \"\\nType: \" + ($json.requestType || \"general\") + \"\\nPriority: \" + ($json.priority || \"normal\") + \"\\nEscalation score: \" + ($json.escalationScore || 0) + \"\\n\\nApprove: \" + ($json.approvalApproveUrl || \"N/A\") + \"\\nReject: \" + ($json.approvalRejectUrl || \"N/A\") + \"\\n\\nDetails: \" + ($json.details || \"N/A\")}}"
+      },
+      "id": "gmail_approver_assignment",
+      "name": "Gmail Approver Assignment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.escalationOwnerFlag}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "escalation_owner_check",
+      "name": "Escalation Owner Notice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$json.ownerEmail || $env.OWNER_EMAIL || \"owner@example.com\"}}",
         "subject": "Escalated Ops Request",
-        "message": "={{\"Escalation score: \" + ($json.escalationScore || 0) + \"\\nType: \" + ($json.requestType || \"general\")}}"
+        "message": "={{\"Escalation score: \" + ($json.escalationScore || 0) + \"\\nType: \" + ($json.requestType || \"general\") + \"\\nApprover: \" + ($json.approver || \"ops-manager\") + \"\\nStatus: \" + ($json.status || \"pending\")}}"
       },
       "id": "gmail_owner_escalation",
       "name": "Gmail Owner Escalation",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2050,
-        180
+        3300,
+        500
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "path": "ops-approval-action-v1",
+        "httpMethod": "POST",
+        "responseMode": "lastNode"
+      },
+      "id": "approval_action_webhook",
+      "name": "Approval Action Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        760
+      ],
+      "webhookId": "ops-approval-action-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const payload = item.json || {};\n  const body = payload.body && typeof payload.body === 'object' ? payload.body : {};\n  const query = payload.query && typeof payload.query === 'object' ? payload.query : {};\n\n  const action = String(body.action || query.action || payload.action || '').trim().toLowerCase();\n  const requestId = String(body.requestId || query.requestId || payload.requestId || '').trim();\n  const requesterEmail = String(body.requesterEmail || query.requesterEmail || payload.requesterEmail || '').trim().toLowerCase();\n  const approverEmail = String(body.approverEmail || query.approverEmail || payload.approverEmail || '').trim().toLowerCase();\n  const ownerEmail = String(body.ownerEmail || query.ownerEmail || payload.ownerEmail || process.env.OWNER_EMAIL || 'owner@example.com').trim();\n  const note = String(body.note || query.note || payload.note || '').trim();\n\n  const normalizedAction = action === 'approve' ? 'approved' : (action === 'reject' || action === 'rejected' ? 'rejected' : '');\n  const isValidActionFlag = normalizedAction && requestId ? 1 : 0;\n\n  output.push({\n    json: {\n      ...payload,\n      action: normalizedAction || action,\n      requestId,\n      requesterEmail,\n      approverEmail,\n      ownerEmail,\n      note,\n      isValidActionFlag,\n      decisionStatus: normalizedAction || 'invalid',\n      decisionAt: new Date().toISOString(),\n    },\n  });\n}\n\nreturn output;"
+      },
+      "id": "normalize_approval_action",
+      "name": "Normalize Approval Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        760
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.isValidActionFlag}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "approval_action_valid_check",
+      "name": "Approval Action Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{\"⚠️ Invalid approval action callback received. requestId=\" + ($json.requestId || \"missing\") + \" action=\" + ($json.action || \"missing\")}}"
+      },
+      "id": "slack_invalid_approval_action",
+      "name": "Slack Invalid Approval Action",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        660
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{$env.SLACK_CHANNEL_ID || \"C01234567\"}}"
+        },
+        "messageType": "text",
+        "text": "={{\"✅ Approval decision: \" + ($json.decisionStatus || \"unknown\") + \" | request \" + ($json.requestId || \"N/A\")}}"
+      },
+      "id": "slack_approval_decision",
+      "name": "Slack Approval Decision",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        820
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "={{$env.OPS_NOTION_DB_URL || $env.NOTION_DATABASE_URL || \"https://www.notion.so/00000000000000000000000000000000\"}}"
+        },
+        "title": "={{\"Ops Approval: \" + ($json.requestId || \"N/A\") + \" | \" + ($json.decisionStatus || \"unknown\")}}",
+        "simple": true
+      },
+      "id": "notion_approval_decision_log",
+      "name": "Notion Approval Decision Log",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        760
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$json.requesterEmail || $json.ownerEmail || $env.OWNER_EMAIL || \"owner@example.com\"}}",
+        "subject": "Ops Request Decision",
+        "message": "={{\"Request \" + ($json.requestId || \"N/A\") + \" has been \" + ($json.decisionStatus || \"updated\") + \".\\nTime: \" + ($json.decisionAt || \"N/A\") + \"\\nNote: \" + ($json.note || \"N/A\")}}"
+      },
+      "id": "gmail_approval_decision",
+      "name": "Gmail Approval Decision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1340,
+        760
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -262,6 +600,51 @@
       ]
     },
     "Normalize Ops Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Ops Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Ops Request": {
+      "main": [
+        [
+          {
+            "node": "Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Inject Ops Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Invalid Ops Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Invalid Ops Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Ops Config": {
       "main": [
         [
           {
@@ -352,16 +735,6 @@
             "node": "Slack Escalation Alert",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Notion Record Request",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Gmail Owner Escalation",
-            "type": "main",
-            "index": 0
           }
         ],
         [
@@ -369,7 +742,35 @@
             "node": "Slack Standard Alert",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Slack Escalation Alert": {
+      "main": [
+        [
+          {
+            "node": "Dedupe Ops Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Standard Alert": {
+      "main": [
+        [
+          {
+            "node": "Dedupe Ops Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe Ops Request": {
+      "main": [
+        [
           {
             "node": "Notion Record Request",
             "type": "main",
@@ -383,6 +784,94 @@
         [
           {
             "node": "Gmail Request Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Approver Email Available?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalation Owner Notice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approver Email Available?": {
+      "main": [
+        [
+          {
+            "node": "Gmail Approver Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Escalation Owner Notice?": {
+      "main": [
+        [
+          {
+            "node": "Gmail Owner Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Approval Action Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Approval Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Approval Action": {
+      "main": [
+        [
+          {
+            "node": "Approval Action Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Action Valid?": {
+      "main": [
+        [
+          {
+            "node": "Slack Approval Decision",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion Approval Decision Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Approval Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Invalid Approval Action",
             "type": "main",
             "index": 0
           }
