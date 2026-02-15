@@ -1,8 +1,15 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const { defineSecret } = require('firebase-functions/params');
 
 admin.initializeApp();
+
+// Define secrets
+const emailUser = defineSecret('EMAIL_USER');
+const emailPassword = defineSecret('EMAIL_PASSWORD');
+const adminEmail = defineSecret('ADMIN_EMAIL');
+const openrouterKey = defineSecret('OPENROUTER_API_KEY');
 
 // ============================================================
 // 🔍 PART 1: FIND PROSPECTS (Google Maps Scraper)
@@ -329,16 +336,18 @@ async function scrapeWebsiteForEmail(website) {
 // 💌 PART 3: SEND COLD EMAILS (50 per day)
 // ============================================================
 
-exports.sendColdEmails = functions.pubsub
+exports.sendColdEmails = functions
+  .runWith({ secrets: [emailUser, emailPassword, openrouterKey] })
+  .pubsub
   .schedule('0 9 * * 1-5') // Monday-Friday at 9am
   .timeZone('America/Toronto')
   .onRun(async (context) => {
 
-    // Get email config from environment
-    const emailUser = process.env.EMAIL_USER;
-    const emailPassword = process.env.EMAIL_PASSWORD;
+    // Get email config from secrets
+    const userEmail = emailUser.value();
+    const userPassword = emailPassword.value();
 
-    if (!emailUser || !emailPassword) {
+    if (!userEmail || !userPassword) {
       console.error('Email credentials not configured!');
       return null;
     }
@@ -347,8 +356,8 @@ exports.sendColdEmails = functions.pubsub
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: emailUser,
-        pass: emailPassword
+        user: userEmail,
+        pass: userPassword
       }
     });
 
@@ -367,16 +376,16 @@ exports.sendColdEmails = functions.pubsub
 
       try {
         // Generate personalized email with AI
-        const personalizedEmail = await generatePersonalizedEmail(prospect);
+        const personalizedEmail = await generatePersonalizedEmail(prospect, openrouterKey.value());
 
         // Send email
         await transporter.sendMail({
-          from: `Jeffery Addae <${emailUser}>`,
+          from: `Jeffery Addae <${userEmail}>`,
           to: prospect.email,
           subject: `Quick question about ${prospect.company}`,
           text: personalizedEmail,
           headers: {
-            'Reply-To': emailUser
+            'Reply-To': userEmail
           }
         });
 
@@ -408,13 +417,13 @@ exports.sendColdEmails = functions.pubsub
   });
 
 // Helper: Generate personalized email with AI
-async function generatePersonalizedEmail(prospect) {
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-
-  if (!openRouterKey) {
+async function generatePersonalizedEmail(prospect, apiKey) {
+  if (!apiKey) {
     // Fallback template if no AI
     return generateFallbackEmail(prospect);
   }
+
+  const openRouterKey = apiKey;
 
   try {
     const prompt = `Write a short, friendly cold email (under 150 words) for ${prospect.company}, a ${prospect.industry} business in ${prospect.city}, Ontario.
@@ -489,17 +498,19 @@ P.S. Book a call here: https://www.jefferyaddae.it.com/contact`;
 // 🔁 PART 4: AUTO FOLLOW-UPS
 // ============================================================
 
-exports.sendFollowUps = functions.pubsub
+exports.sendFollowUps = functions
+  .runWith({ secrets: [emailUser, emailPassword] })
+  .pubsub
   .schedule('0 10 * * 1-5') // Weekdays at 10am
   .timeZone('America/Toronto')
   .onRun(async (context) => {
 
-    const emailUser = process.env.EMAIL_USER;
-    const emailPassword = process.env.EMAIL_PASSWORD;
+    const userEmail = emailUser.value();
+    const userPassword = emailPassword.value();
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: { user: emailUser, pass: emailPassword }
+      auth: { user: userEmail, pass: userPassword }
     });
 
     const today = new Date();
@@ -524,7 +535,7 @@ exports.sendFollowUps = functions.pubsub
         const subject = getFollowUpSubject(followUpNumber, prospect);
 
         await transporter.sendMail({
-          from: `Jeffery Addae <${emailUser}>`,
+          from: `Jeffery Addae <${userEmail}>`,
           to: prospect.email,
           subject: subject,
           text: followUpEmail
@@ -613,7 +624,9 @@ function getFollowUpSubject(number, prospect) {
 // 📥 PART 5: CAPTURE WEBSITE LEADS (from your portfolio form)
 // ============================================================
 
-exports.onLeadSubmit = functions.firestore
+exports.onLeadSubmit = functions
+  .runWith({ secrets: [emailUser, emailPassword, adminEmail] })
+  .firestore
   .document('leads/{leadId}')
   .onCreate(async (snap, context) => {
 
@@ -624,31 +637,39 @@ exports.onLeadSubmit = functions.firestore
     let priority = 'Cold';
     const tags = [];
 
-    // Budget scoring
-    if (lead.budget === '$4,000–$10,000+') {
-      score += 40;
-      tags.push('High Budget');
-    } else if (lead.budget === '$1,500–$4,000') {
-      score += 25;
-      tags.push('Medium Budget');
-    } else if (lead.budget === '$500–$1,200') {
-      score += 10;
+    // Budget scoring (if provided)
+    if (lead.budget) {
+      if (lead.budget === '$4,000–$10,000+' || lead.budget.includes('10000') || lead.budget.includes('10,000')) {
+        score += 40;
+        tags.push('High Budget');
+      } else if (lead.budget === '$1,500–$4,000' || lead.budget.includes('4000') || lead.budget.includes('1500')) {
+        score += 25;
+        tags.push('Medium Budget');
+      } else if (lead.budget === '$500–$1,200' || lead.budget.includes('500') || lead.budget.includes('1200')) {
+        score += 10;
+      }
     }
 
-    // Timeline urgency
-    if (lead.timeline === 'ASAP') {
-      score += 30;
-      tags.push('Urgent');
-    } else if (lead.timeline === '1–2 weeks') {
-      score += 20;
-    } else if (lead.timeline === '2–4 weeks') {
-      score += 10;
+    // Timeline urgency (flexible matching)
+    if (lead.timeline) {
+      const timelineLower = lead.timeline.toLowerCase();
+      if (timelineLower.includes('asap') || timelineLower.includes('urgent') || timelineLower.includes('immediate')) {
+        score += 30;
+        tags.push('Urgent');
+      } else if (timelineLower.includes('1') || timelineLower.includes('week') || timelineLower.includes('soon')) {
+        score += 20;
+      } else if (timelineLower.includes('2') || timelineLower.includes('month')) {
+        score += 10;
+      }
     }
 
-    // Goal/Service type
-    if (lead.goal && lead.goal.includes('automation')) {
-      score += 20;
-      tags.push('High-Value Service');
+    // Goal/Service type (flexible matching)
+    if (lead.goal) {
+      const goalLower = lead.goal.toLowerCase();
+      if (goalLower.includes('automation') || goalLower.includes('ai') || goalLower.includes('chatbot')) {
+        score += 20;
+        tags.push('High-Value Service');
+      }
     }
 
     // Has company = more serious
@@ -680,7 +701,12 @@ exports.onLeadSubmit = functions.firestore
 
     // Send alert if hot lead
     if (priority === 'Hot') {
-      await sendHotLeadAlert(lead);
+      await sendHotLeadAlert(
+        lead,
+        emailUser.value(),
+        emailPassword.value(),
+        adminEmail.value()
+      );
     }
 
     console.log(`Lead scored: ${lead.name} - ${priority} (${score}/100)`);
@@ -689,20 +715,16 @@ exports.onLeadSubmit = functions.firestore
   });
 
 // Send hot lead alert
-async function sendHotLeadAlert(lead) {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPassword = process.env.EMAIL_PASSWORD;
-  const adminEmail = process.env.ADMIN_EMAIL || emailUser;
-
+async function sendHotLeadAlert(lead, userEmail, userPassword, userAdminEmail) {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: { user: emailUser, pass: emailPassword }
+    auth: { user: userEmail, pass: userPassword }
   });
 
   try {
     await transporter.sendMail({
-      from: emailUser,
-      to: adminEmail,
+      from: userEmail,
+      to: userAdminEmail,
       subject: `🔥 HOT LEAD: ${lead.name} - ${lead.budget}`,
       text: `HIGH PRIORITY LEAD RECEIVED!
 

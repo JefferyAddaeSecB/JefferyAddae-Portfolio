@@ -45,24 +45,6 @@
           "order": "ASCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "prospects",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "emailCount",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "followUpDate",
-          "order": "ASCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []

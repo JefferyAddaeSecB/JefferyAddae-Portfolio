@@ -110,15 +110,18 @@ const ContactForm = () => {
 
     try {
       const payload = {
+        name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
+        details: formData.message.trim(),
         message: formData.message.trim(),
         company: formData.company?.trim() || "",
         role: formData.role?.trim() || "",
         website: formData.website?.trim() || "",
-        tools: formData.tools || "",
-        urgency: formData.urgency || "",
+        goal: formData.tools || "",
+        timeline: formData.urgency || "",
+        budget: "", // Optional - can be added later
         source: "portfolio-contact",
         status: "new",
         pageUrl: typeof window !== "undefined" ? window.location.href : "",
@@ -130,7 +133,7 @@ const ContactForm = () => {
       });
 
       await Promise.race([
-        addDoc(collection(firestore, "contactMessages"), payload),
+        addDoc(collection(firestore, "leads"), payload),
         timeoutPromise,
       ]);
       setErrors({});
