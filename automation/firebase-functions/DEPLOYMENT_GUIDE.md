@@ -164,7 +164,7 @@ await admin.firestore().collection('leads').add({
 The `onLeadSubmit` function will automatically:
 - Score the lead (0-100)
 - Assign priority (Hot/Warm/Cold)
-- Send you an email if it's a hot lead!
+- Send you an owner email for every lead (Hot/Warm/Cold)
 
 ---
 
@@ -182,7 +182,7 @@ The `onLeadSubmit` function will automatically:
 ### **Real-Time:**
 
 ```
-Website form submitted → Lead scored → You get alert (if hot)
+Website form submitted → Lead scored → User auto-reply + owner alert (every lead)
 ```
 
 ---
@@ -240,6 +240,30 @@ Collections:
 - Check function logs: `firebase functions:log`
 - Verify prospects have status "Ready to Contact"
 - Check Gmail daily send limit (500/day for free Gmail)
+
+---
+
+## ✅ **Post-Deploy Smoke Check**
+
+Run this immediately after deploy to verify auto-reply + owner alert are active:
+
+1. Create a test lead document in Firestore collection `leads` with at least:
+   - `name`, `email`, `message`, `timeline`, `goal`, `company`, `createdAt`
+2. Watch `onLeadSubmit` logs:
+   ```bash
+   firebase functions:log --only onLeadSubmit -n 100
+   ```
+3. Confirm these log signals:
+   - `Lead scored: ...`
+   - `✅ Auto-reply sent to ...`
+   - `📩 Owner lead alert sent (...)`
+4. Confirm both email deliveries:
+   - User gets auto-reply
+   - Owner gets lead notification
+5. Confirm no SMTP auth failures:
+   - no `EAUTH`
+   - no `535 Username and Password not accepted`
+6. Delete the test lead document.
 
 ---
 

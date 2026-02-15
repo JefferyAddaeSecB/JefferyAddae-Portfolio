@@ -1,0 +1,346 @@
+{
+  "name": "Automated Reporting and Dashboards",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3fe23b85-b954-4f6f-a462-87ce69961980",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "daily_trigger",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://example-analytics.local/api/metrics"
+      },
+      "id": "pull_product_analytics",
+      "name": "Pull Product Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        460,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://example-billing.local/api/revenue"
+      },
+      "id": "pull_revenue_metrics",
+      "name": "Pull Revenue Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        460,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_source_metrics",
+      "name": "Merge Source Metrics",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        700,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const data = item.json;\n  const arr = Array.isArray(data) ? data : [data];\n  const normalized = arr.flatMap((x) => (Array.isArray(x.metrics) ? x.metrics : [x]));\n\n  const revenue = Number(item.json.totalRevenue || item.json.revenue || 0);\n  const previousRevenue = Number(item.json.previousRevenue || item.json.lastPeriodRevenue || 0);\n  const changePct = previousRevenue > 0 ? ((revenue - previousRevenue) / previousRevenue) * 100 : 0;\n\n  const anomalyScore = Math.min(100, Math.max(0, Math.round(Math.abs(changePct) * 2)));\n\n  return {\n    json: {\n      ...item.json,\n      normalizedMetricCount: normalized.length,\n      kpiSummary: {\n        revenue,\n        previousRevenue,\n        changePct: Number(changePct.toFixed(2))\n      },\n      anomalyScore,\n      reportGeneratedAt: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "compute_kpi_pack",
+      "name": "Compute KPI Pack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You generate executive KPI summaries. Return JSON: executiveSummary (string), actionItems (array of short strings).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_narrative_generator",
+      "name": "AI Narrative Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1170,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      executiveSummary: String(ai.executiveSummary || 'Executive summary unavailable; fallback to KPI payload.'),\n      actionItems: Array.isArray(ai.actionItems) ? ai.actionItems : []\n    }\n  };\n});"
+      },
+      "id": "parse_ai_narrative",
+      "name": "Parse AI Narrative",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1390,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_kpi_narrative",
+      "name": "Merge KPI + Narrative",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1390,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-dashboard.local/api/refresh",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "publish_dashboard_snapshot",
+      "name": "Publish Dashboard Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1610,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-mail.local/api/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"to\":\"exec-team@company.com\",\"subject\":\"Daily KPI Brief\",\"summary\":$json.executiveSummary,\"actions\":$json.actionItems,\"kpi\":$json.kpiSummary}"
+      },
+      "id": "send_executive_email_brief",
+      "name": "Send Executive Email Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1830,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.anomalyScore}}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "anomaly_score_critical",
+      "name": "Anomaly Score Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1610,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/ANALYTICS/ALERTS",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"🚨 KPI anomaly detected (score {{$json.anomalyScore}}). Revenue delta: {{$json.kpiSummary.changePct}}%.\"}"
+      },
+      "id": "send_anomaly_alert",
+      "name": "Send Anomaly Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1830,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Pull Product Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pull Revenue Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pull Product Analytics": {
+      "main": [
+        [
+          {
+            "node": "Merge Source Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pull Revenue Metrics": {
+      "main": [
+        [
+          {
+            "node": "Merge Source Metrics",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Source Metrics": {
+      "main": [
+        [
+          {
+            "node": "Compute KPI Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute KPI Pack": {
+      "main": [
+        [
+          {
+            "node": "AI Narrative Generator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge KPI + Narrative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Narrative Generator": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Narrative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Narrative": {
+      "main": [
+        [
+          {
+            "node": "Merge KPI + Narrative",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge KPI + Narrative": {
+      "main": [
+        [
+          {
+            "node": "Publish Dashboard Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Anomaly Score Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Dashboard Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Send Executive Email Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomaly Score Critical?": {
+      "main": [
+        [
+          {
+            "node": "Send Anomaly Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  }
+}

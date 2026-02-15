@@ -33,5 +33,15 @@ service cloud.firestore {
 
       allow read, update, delete: if false;
     }
+
+    // LEADS COLLECTION - For triggering auto-reply Firebase Function
+    match /leads/{docId} {
+      allow create: if request.resource.data.name is string
+      && request.resource.data.email is string
+      && request.resource.data.name.size() >= 1
+      && request.resource.data.email.size() >= 3;
+
+      allow read, update, delete: if false;
+    }
   }
 }

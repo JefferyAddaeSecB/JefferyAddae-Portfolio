@@ -10,3 +10,6 @@ vite.config.ts.*
 .env
 .env.local
 .env.*.local
+
+# Local published repo mirrors
+case-study-repos/

@@ -1,0 +1,325 @@
+{
+  "name": "Lead Intake Qualification Pipeline",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2f2d5f8b-7d52-4270-9352-b8fc66fd03a1",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead-intake-v2",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "id": "lead_webhook",
+      "name": "Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ],
+      "webhookId": "lead-intake-v2"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "pipeline",
+              "value": "lead-intake-qualification"
+            },
+            {
+              "name": "receivedAt",
+              "value": "={{new Date().toISOString()}}"
+            }
+          ]
+        }
+      },
+      "id": "normalize_lead_payload",
+      "name": "Normalize Lead Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        440,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const urgency = String(item.json.urgency || 'normal').toLowerCase();\n  const source = String(item.json.source || 'unknown').toLowerCase();\n  const tools = String(item.json.tools || item.json.toolsInvolved || '').toLowerCase();\n\n  let score = 35;\n  if (budget >= 5000) score += 25;\n  if (budget >= 12000) score += 10;\n  if (urgency.includes('urgent') || urgency.includes('high')) score += 15;\n  if (source.includes('referral')) score += 8;\n  if (tools.includes('hubspot') || tools.includes('salesforce')) score += 7;\n\n  const deterministicPriority = score >= 75 ? 'hot' : score >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore: Math.min(score, 100),\n      deterministicPriority\n    }\n  };\n});"
+      },
+      "id": "deterministic_lead_scoring",
+      "name": "Deterministic Lead Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You score inbound B2B leads. Return strict JSON with keys aiScore (0-100 number), priority (hot|warm|cold), rationale (short string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_qualification",
+      "name": "AI Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? raw.data?.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiScore: Number(ai.aiScore ?? ai.score ?? 0),\n      aiPriority: String(ai.priority || '').toLowerCase(),\n      aiRationale: String(ai.rationale || 'ai_response_unavailable')\n    }\n  };\n});"
+      },
+      "id": "parse_ai_qualification",
+      "name": "Parse AI Qualification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_scoring_signals",
+      "name": "Merge Scoring Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const deterministic = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const blended = aiScore > 0\n    ? Math.round((deterministic * 0.6) + (aiScore * 0.4))\n    : deterministic;\n\n  const priority = blended >= 75 ? 'hot' : blended >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      leadScore: blended,\n      priority,\n      scoringSource: aiScore > 0 ? 'blended_ai_plus_rules' : 'deterministic_rules_only'\n    }\n  };\n});"
+      },
+      "id": "final_priority_decision",
+      "name": "Final Priority Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.leadScore}}",
+              "operation": "largerEqual",
+              "value2": 75
+            }
+          ]
+        }
+      },
+      "id": "if_hot_lead",
+      "name": "Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/SALES/WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"🔥 HOT lead: {{$json.firstName || $json.name || \"Unknown\"}} ({{$json.email || \"no-email\"}}) score {{$json.leadScore}}\"}"
+      },
+      "id": "send_sales_alert",
+      "name": "Send Sales Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-crm.local/api/leads/upsert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "upsert_lead_crm",
+      "name": "Upsert Lead in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-mail.local/api/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"to\":\"owner@jefferyaddae.com\",\"subject\":\"New {{$json.priority}} lead scored {{$json.leadScore}}\",\"payload\":$json}"
+      },
+      "id": "owner_notification",
+      "name": "Owner Email Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Lead Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Lead Scoring": {
+      "main": [
+        [
+          {
+            "node": "AI Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Scoring Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Qualification": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Qualification": {
+      "main": [
+        [
+          {
+            "node": "Merge Scoring Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Scoring Signals": {
+      "main": [
+        [
+          {
+            "node": "Final Priority Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Priority Decision": {
+      "main": [
+        [
+          {
+            "node": "Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot Lead?": {
+      "main": [
+        [
+          {
+            "node": "Send Sales Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert Lead in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upsert Lead in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead in CRM": {
+      "main": [
+        [
+          {
+            "node": "Owner Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

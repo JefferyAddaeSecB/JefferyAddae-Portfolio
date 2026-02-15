@@ -125,7 +125,7 @@ The system runs automatically:
 ### **onLeadSubmit** (Triggered on form submit)
 - Scores leads 0-100
 - Assigns priority (Hot/Warm/Cold)
-- Sends you alert for hot leads
+- Sends you an owner alert for every lead (Hot/Warm/Cold)
 
 ---
 
@@ -220,6 +220,30 @@ Create a Google Sheet and connect it to Firestore to track:
 - Check if prospects have websites
 - Email finding success rate is ~50-60%
 - Consider using Hunter.io free tier (50/month)
+
+---
+
+## ✅ Post-Deploy Smoke Check
+
+Run this after every functions deploy to verify lead auto-reply and owner alert are still working.
+
+1. Create a test lead in Firestore (`leads` collection) with these minimum fields:
+   - `name`, `email`, `message`, `timeline`, `goal`, `company`, `createdAt`
+2. Check `onLeadSubmit` logs:
+   ```bash
+   firebase functions:log --only onLeadSubmit -n 100
+   ```
+3. Confirm success log lines:
+   - `Lead scored: ...`
+   - `✅ Auto-reply sent to ...`
+   - `📩 Owner lead alert sent (...)`
+4. Confirm both inbox deliveries:
+   - User inbox receives auto-reply
+   - Owner inbox receives lead notification
+5. Confirm no auth failures:
+   - No `EAUTH`
+   - No `535 Username and Password not accepted`
+6. Delete the test lead from Firestore when done.
 
 ---
 

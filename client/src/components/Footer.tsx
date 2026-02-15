@@ -56,6 +56,11 @@ const Footer = () => {
                   How It Works
                 </span>
               </Link>
+              <Link href="/faq">
+                <span className="text-muted-foreground hover:text-primary cursor-pointer">
+                  FAQ
+                </span>
+              </Link>
               <Link href="/about">
                 <span className="text-muted-foreground hover:text-primary cursor-pointer">
                   About

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import ContactForm from "@/components/ContactForm";
 import FAQAccordion from "@/components/FAQAccordion";
@@ -231,9 +231,16 @@ const Contact = () => {
             transition={{ duration: 0.5 }}
             className="mt-16"
           >
-            <h3 className="text-xl font-bold text-foreground mb-6">
-              Questions?
-            </h3>
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <h3 className="text-xl font-bold text-foreground">
+                Questions?
+              </h3>
+              <Link href="/faq">
+                <span className="text-sm text-primary hover:underline cursor-pointer">
+                  View full FAQ
+                </span>
+              </Link>
+            </div>
             <FAQAccordion items={faqItems} />
           </motion.div>
         </div>

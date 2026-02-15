@@ -16,6 +16,7 @@ const Skills = lazy(() => import("@/pages/Skills"));
 const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectCaseStudy = lazy(() => import("@/pages/ProjectCaseStudy"));
 const Contact = lazy(() => import("@/pages/Contact"));
+const FAQ = lazy(() => import("@/pages/FAQ"));
 const CV = lazy(() => import("@/pages/CV"));
 const HowItWorks = lazy(() => import("@/pages/HowItWorks"));
 const Experience = lazy(() => import("@/pages/Experience"));
@@ -76,6 +77,7 @@ function Router() {
             <Route path="/projects/:slug" component={ProjectCaseStudy} />
             <Route path="/projects" component={Projects} />
             <Route path="/how-it-works" component={HowItWorks} />
+            <Route path="/faq" component={FAQ} />
             <Route path="/experience" component={Experience} />
             <Route path="/contact" component={Contact} />
             <Route path="/cv" component={CV} />

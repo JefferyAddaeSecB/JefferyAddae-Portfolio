@@ -1,0 +1,313 @@
+{
+  "name": "AI Support Ticket Triage",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ea44b9b8-71f6-46e2-9804-0d5ef0ba1c93",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "support-ticket-v2",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "id": "ticket_webhook",
+      "name": "Ticket Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ],
+      "webhookId": "support-ticket-v2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const message = String(item.json.message || item.json.description || '').trim();\n  const subject = String(item.json.subject || 'No subject');\n  return {\n    json: {\n      ...item.json,\n      subject,\n      message: message || 'No message provided',\n      receivedAt: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "validate_ticket_payload",
+      "name": "Validate Ticket Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const text = String(item.json.subject || \"\") + \" \" + String(item.json.message || \"\");\n  const loweredText = text.toLowerCase();\n  let ruleSeverityScore = 30;\n\n  if (loweredText.includes('outage') || loweredText.includes('down')) ruleSeverityScore += 35;\n  if (loweredText.includes('payment') || loweredText.includes('billing')) ruleSeverityScore += 20;\n  if (loweredText.includes('security') || loweredText.includes('breach')) ruleSeverityScore += 25;\n\n  return {\n    json: {\n      ...item.json,\n      ruleSeverityScore,\n      baselineQueue: ruleSeverityScore >= 70 ? 'urgent-human' : 'ai-assisted'\n    }\n  };\n});"
+      },
+      "id": "deterministic_severity_rules",
+      "name": "Deterministic Severity Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        670,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You triage support tickets. Return JSON: aiSeverityScore (0-100), queue (urgent-human|human|ai-assisted), triageSummary (string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_triage_agent",
+      "name": "AI Triage Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiSeverityScore: Number(ai.aiSeverityScore ?? 0),\n      aiQueue: String(ai.queue || ''),\n      aiTriageSummary: String(ai.triageSummary || 'ai_response_unavailable')\n    }\n  };\n});"
+      },
+      "id": "parse_ai_triage",
+      "name": "Parse AI Triage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_triage_signals",
+      "name": "Merge Triage Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const rules = Number(item.json.ruleSeverityScore || 0);\n  const ai = Number(item.json.aiSeverityScore || 0);\n  const triageScore = ai > 0 ? Math.round((rules * 0.6) + (ai * 0.4)) : rules;\n  const needsHuman = triageScore >= 70;\n\n  return {\n    json: {\n      ...item.json,\n      triageScore,\n      needsHuman,\n      finalQueue: needsHuman ? 'urgent-human' : item.json.aiQueue || item.json.baselineQueue,\n      triageSummary: item.json.aiTriageSummary || 'rules-only triage applied'\n    }\n  };\n});"
+      },
+      "id": "final_triage_decision",
+      "name": "Final Triage Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.triageScore}}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "human_escalation_required",
+      "name": "Human Escalation Required?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-pagerduty.local/api/incidents",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"title\":\"Urgent support ticket\",\"ticket\":$json.ticketId || $json.id || \"unknown\",\"score\":$json.triageScore,\"summary\":$json.triageSummary}"
+      },
+      "id": "escalate_to_human_queue",
+      "name": "Escalate to Human Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-helpdesk.local/api/tickets/triage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "update_helpdesk_ticket",
+      "name": "Update Helpdesk Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/SUPPORT/SUMMARY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"Ticket triaged to {{$json.finalQueue}} | score {{$json.triageScore}} | {{$json.triageSummary}}\"}"
+      },
+      "id": "post_triage_summary",
+      "name": "Post Triage Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Ticket Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Ticket Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Ticket Payload": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Severity Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Severity Rules": {
+      "main": [
+        [
+          {
+            "node": "AI Triage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Triage Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Triage Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Triage": {
+      "main": [
+        [
+          {
+            "node": "Merge Triage Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Triage Signals": {
+      "main": [
+        [
+          {
+            "node": "Final Triage Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Triage Decision": {
+      "main": [
+        [
+          {
+            "node": "Human Escalation Required?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Escalation Required?": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Human Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Helpdesk Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Helpdesk Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Helpdesk Ticket": {
+      "main": [
+        [
+          {
+            "node": "Post Triage Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

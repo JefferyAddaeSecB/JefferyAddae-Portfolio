@@ -49,17 +49,36 @@ export default async function handler(req: any, res: any) {
         if (db) {
           const createdAt = new Date().toISOString();
           const docRef = db.collection('leads').doc();
+
+          // Split name for firstName
+          const nameParts = payload.full_name.split(' ');
+          const firstName = nameParts[0] || payload.full_name;
+
           const newLead = {
-            full_name: payload.full_name,
+            // Fields for Firebase Function compatibility
+            name: payload.full_name,
+            firstName: firstName,
+            lastName: nameParts.slice(1).join(' ') || '',
             email: payload.email,
             phone: payload.phone || null,
             company: payload.company || null,
             role: payload.role || null,
+            details: payload.message, // Map message -> details for function
+            message: payload.message, // Keep original for compatibility
+            goal: payload.primary_goal || null, // Map primary_goal -> goal for function
+            timeline: payload.timeline || null,
+            budget: payload.budget_range || null, // Map budget_range -> budget for function
+            consent: payload.consent,
+
+            // Original fields for backward compatibility
+            full_name: payload.full_name,
             inquiry_type: payload.inquiry_type || null,
             primary_goal: payload.primary_goal || null,
             tools_in_use: payload.tools_in_use || [],
-            message: payload.message,
-            consent: payload.consent,
+
+            // Meta & tracking
+            source: 'portfolio-contact-api',
+            status: 'new',
             client_meta: {
               ...clientMetaInput,
               ip,

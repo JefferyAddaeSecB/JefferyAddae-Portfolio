@@ -1,0 +1,346 @@
+{
+  "name": "Revenue Ops CRM Sync and Enrichment",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f5002b8a-e495-438c-a953-8e8f36df07ac",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "six_hour_trigger",
+      "name": "6 Hour Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://example-crm.local/api/deals/stale"
+      },
+      "id": "fetch_stale_deals",
+      "name": "Fetch Stale Deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-enrichment.local/api/company",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "enrich_company_profile",
+      "name": "Enrich Company Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const ageDays = Number(item.json.daysInStage || item.json.stageAgeDays || 0);\n  const amount = Number(item.json.amount || item.json.dealValue || 0);\n\n  let deterministicRisk = 25;\n  if (ageDays > 14) deterministicRisk += 30;\n  if (ageDays > 30) deterministicRisk += 20;\n  if (amount >= 10000) deterministicRisk += 15;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicRisk: Math.min(deterministicRisk, 100)\n    }\n  };\n});"
+      },
+      "id": "deterministic_deal_health_scoring",
+      "name": "Deterministic Deal Health Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You analyze CRM deals for slippage risk. Return JSON: aiRiskScore (0-100), reason (string), recommendedAction (string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_deal_risk_analyst",
+      "name": "AI Deal Risk Analyst",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1170,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiRiskScore: Number(ai.aiRiskScore ?? 0),\n      aiReason: String(ai.reason || 'ai_response_unavailable'),\n      aiRecommendedAction: String(ai.recommendedAction || 'manual_review')\n    }\n  };\n});"
+      },
+      "id": "parse_ai_deal_risk",
+      "name": "Parse AI Deal Risk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1390,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_deal_risk_signals",
+      "name": "Merge Deal Risk Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1390,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const deterministicRisk = Number(item.json.deterministicRisk || 0);\n  const aiRiskScore = Number(item.json.aiRiskScore || 0);\n  const dealRiskScore = aiRiskScore > 0\n    ? Math.round((deterministicRisk * 0.65) + (aiRiskScore * 0.35))\n    : deterministicRisk;\n\n  return {\n    json: {\n      ...item.json,\n      dealRiskScore,\n      health: dealRiskScore >= 70 ? 'at_risk' : 'healthy'\n    }\n  };\n});"
+      },
+      "id": "final_deal_risk_decision",
+      "name": "Final Deal Risk Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1610,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.dealRiskScore}}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "at_risk_deal",
+      "name": "At Risk Deal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1830,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-pm.local/api/tasks",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"title\":\"Deal rescue playbook\",\"dealId\":$json.dealId || $json.id,\"risk\":$json.dealRiskScore,\"reason\":$json.aiReason,\"action\":$json.aiRecommendedAction}"
+      },
+      "id": "create_rescue_task",
+      "name": "Create Rescue Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2050,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-crm.local/api/deals/upsert-health",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "upsert_crm_health_fields",
+      "name": "Upsert CRM Health Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2050,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/REVOPS/STATUS",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"Deal {{$json.dealId || $json.id}} marked {{$json.health}} (score {{$json.dealRiskScore}}).\"}"
+      },
+      "id": "notify_revops_channel",
+      "name": "Notify RevOps Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2270,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "6 Hour Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Stale Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Stale Deals": {
+      "main": [
+        [
+          {
+            "node": "Enrich Company Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Company Profile": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Deal Health Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Deal Health Scoring": {
+      "main": [
+        [
+          {
+            "node": "AI Deal Risk Analyst",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Deal Risk Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Deal Risk Analyst": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Deal Risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Deal Risk": {
+      "main": [
+        [
+          {
+            "node": "Merge Deal Risk Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Deal Risk Signals": {
+      "main": [
+        [
+          {
+            "node": "Final Deal Risk Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Deal Risk Decision": {
+      "main": [
+        [
+          {
+            "node": "At Risk Deal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "At Risk Deal?": {
+      "main": [
+        [
+          {
+            "node": "Create Rescue Task",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert CRM Health Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upsert CRM Health Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert CRM Health Fields": {
+      "main": [
+        [
+          {
+            "node": "Notify RevOps Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

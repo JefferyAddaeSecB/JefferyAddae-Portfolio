@@ -1,0 +1,344 @@
+{
+  "name": "Client Intake and Onboarding",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1f25ef4c-c307-4116-88fa-2ea8f5f719d3",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "client-intake-v2",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "id": "client_intake_webhook",
+      "name": "Client Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ],
+      "webhookId": "client-intake-v2"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "onboardingStatus",
+              "value": "intake_received"
+            },
+            {
+              "name": "intakeCapturedAt",
+              "value": "={{new Date().toISOString()}}"
+            }
+          ]
+        }
+      },
+      "id": "normalize_intake",
+      "name": "Normalize Intake",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        440,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const timeline = String(item.json.timeline || '').toLowerCase();\n  const docsProvided = Number(item.json.docsProvided || 0);\n\n  let readinessScore = 40;\n  if (budget >= 5000) readinessScore += 15;\n  if (timeline.includes('asap') || timeline.includes('this week')) readinessScore += 15;\n  if (docsProvided >= 3) readinessScore += 20;\n\n  return {\n    json: {\n      ...item.json,\n      readinessScore,\n      readinessByRules: readinessScore >= 80 ? 'kickoff-ready' : 'needs-docs'\n    }\n  };\n});"
+      },
+      "id": "deterministic_readiness_engine",
+      "name": "Deterministic Readiness Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        670,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.15,\"messages\":[{\"role\":\"system\",\"content\":\"You create onboarding plans for agency clients. Return JSON: aiReadinessScore (0-100), kickoffRecommendation (ready|not-ready), kickoffChecklist (array), summary (string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_onboarding_planner",
+      "name": "AI Onboarding Planner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiReadinessScore: Number(ai.aiReadinessScore ?? 0),\n      kickoffRecommendationAi: String(ai.kickoffRecommendation || 'not-ready'),\n      kickoffChecklistAi: Array.isArray(ai.kickoffChecklist) ? ai.kickoffChecklist : [],\n      onboardingPlanSummary: String(ai.summary || 'ai_plan_unavailable')\n    }\n  };\n});"
+      },
+      "id": "parse_ai_plan",
+      "name": "Parse AI Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_readiness_signals",
+      "name": "Merge Readiness Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const rules = Number(item.json.readinessScore || 0);\n  const ai = Number(item.json.aiReadinessScore || 0);\n  const blendedReadiness = ai > 0 ? Math.round((rules * 0.65) + (ai * 0.35)) : rules;\n\n  return {\n    json: {\n      ...item.json,\n      readinessScore: blendedReadiness,\n      onboardingStatus: blendedReadiness >= 80 ? 'kickoff_ready' : 'awaiting_documents',\n      kickoffChecklist: item.json.kickoffChecklistAi || []\n    }\n  };\n});"
+      },
+      "id": "final_onboarding_decision",
+      "name": "Final Onboarding Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-notion.local/api/onboarding/tasks",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "create_onboarding_tasks",
+      "name": "Create Onboarding Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1560,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.readinessScore}}",
+              "operation": "largerEqual",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "id": "kickoff_ready",
+      "name": "Kickoff Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-calendly.local/api/schedule",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"email\":$json.email,\"name\":$json.firstName || $json.name,\"status\":\"kickoff_ready\",\"checklist\":$json.kickoffChecklist}"
+      },
+      "id": "schedule_kickoff_meeting",
+      "name": "Schedule Kickoff Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-mail.local/api/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"to\":$json.email,\"subject\":\"Missing documents before kickoff\",\"status\":$json.onboardingStatus,\"summary\":$json.onboardingPlanSummary}"
+      },
+      "id": "request_missing_documents",
+      "name": "Request Missing Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-mail.local/api/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"to\":$json.email,\"subject\":\"Welcome - onboarding started\",\"status\":$json.onboardingStatus,\"summary\":$json.onboardingPlanSummary}"
+      },
+      "id": "send_welcome_next_steps",
+      "name": "Send Welcome + Next Steps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Client Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intake": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Readiness Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Readiness Engine": {
+      "main": [
+        [
+          {
+            "node": "AI Onboarding Planner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Readiness Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Onboarding Planner": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Plan": {
+      "main": [
+        [
+          {
+            "node": "Merge Readiness Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Readiness Signals": {
+      "main": [
+        [
+          {
+            "node": "Final Onboarding Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Onboarding Decision": {
+      "main": [
+        [
+          {
+            "node": "Create Onboarding Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kickoff Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Onboarding Tasks": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome + Next Steps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kickoff Ready?": {
+      "main": [
+        [
+          {
+            "node": "Schedule Kickoff Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Missing Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

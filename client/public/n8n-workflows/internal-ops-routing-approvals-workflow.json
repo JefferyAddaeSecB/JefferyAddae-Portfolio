@@ -1,0 +1,325 @@
+{
+  "name": "Internal Ops Routing and Approvals",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "66e7fbf8-f3df-4456-8d20-7d17956ef31f",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ops-request-v2",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "id": "ops_request_webhook",
+      "name": "Ops Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ],
+      "webhookId": "ops-request-v2"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "intake_received"
+            },
+            {
+              "name": "requestReceivedAt",
+              "value": "={{new Date().toISOString()}}"
+            }
+          ]
+        }
+      },
+      "id": "normalize_ops_request",
+      "name": "Normalize Ops Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        440,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const requestType = String(item.json.requestType || 'general').toLowerCase();\n  const priority = String(item.json.priority || 'normal').toLowerCase();\n  const impact = String(item.json.impact || 'medium').toLowerCase();\n\n  const approver = requestType.includes('finance')\n    ? 'finance-manager'\n    : requestType.includes('security')\n    ? 'security-lead'\n    : 'ops-manager';\n\n  let routingScore = 35;\n  if (priority.includes('high') || priority.includes('urgent')) routingScore += 25;\n  if (impact.includes('high') || impact.includes('critical')) routingScore += 20;\n  if (requestType.includes('access') || requestType.includes('security')) routingScore += 10;\n\n  return {\n    json: {\n      ...item.json,\n      approver,\n      slaHours: routingScore >= 75 ? 4 : routingScore >= 55 ? 12 : 24,\n      routingScore\n    }\n  };\n});"
+      },
+      "id": "policy_routing_engine",
+      "name": "Policy Routing Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        670,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You review internal ops requests for escalation risk. Return JSON: riskScore (0-100), escalationReason (string), shouldEscalate (true|false).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+      },
+      "id": "ai_risk_reviewer",
+      "name": "AI Risk Reviewer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiRiskScore: Number(ai.riskScore ?? 0),\n      shouldEscalateAi: ai.shouldEscalate === true,\n      escalationReasonAi: String(ai.escalationReason || 'ai_response_unavailable')\n    }\n  };\n});"
+      },
+      "id": "parse_ai_risk_review",
+      "name": "Parse AI Risk Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "merge_risk_signals",
+      "name": "Merge Risk Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const routingScore = Number(item.json.routingScore || 0);\n  const aiRiskScore = Number(item.json.aiRiskScore || 0);\n  const escalationScore = aiRiskScore > 0\n    ? Math.round((routingScore * 0.65) + (aiRiskScore * 0.35))\n    : routingScore;\n\n  const escalate = escalationScore >= 70 || item.json.shouldEscalateAi === true;\n\n  return {\n    json: {\n      ...item.json,\n      escalationScore,\n      escalate,\n      approvalStatus: escalate ? 'escalation_required' : 'standard_approval'\n    }\n  };\n});"
+      },
+      "id": "final_routing_decision",
+      "name": "Final Routing Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.escalationScore}}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "escalation_needed",
+      "name": "Escalation Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example-notion.local/api/ops-requests/upsert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "create_request_record",
+      "name": "Create Request Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/OPS/ESCALATION",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"⚠️ Escalated ops request for {{$json.approver}} | score {{$json.escalationScore}} | reason {{$json.escalationReasonAi}}\"}"
+      },
+      "id": "escalate_to_director",
+      "name": "Escalate to Director",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/OPS/APPROVER",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"New {{$json.requestType || \"ops\"}} request assigned to {{$json.approver}} (SLA {{$json.slaHours}}h).\"}"
+      },
+      "id": "notify_assigned_approver",
+      "name": "Notify Assigned Approver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Ops Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Ops Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Ops Request": {
+      "main": [
+        [
+          {
+            "node": "Policy Routing Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Policy Routing Engine": {
+      "main": [
+        [
+          {
+            "node": "AI Risk Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Risk Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Risk Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Risk Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Risk Review": {
+      "main": [
+        [
+          {
+            "node": "Merge Risk Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Risk Signals": {
+      "main": [
+        [
+          {
+            "node": "Final Routing Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Routing Decision": {
+      "main": [
+        [
+          {
+            "node": "Escalation Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Needed?": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Director",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Request Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Request Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Request Record": {
+      "main": [
+        [
+          {
+            "node": "Notify Assigned Approver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,6 +1,8 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const puppeteer = require('puppeteer');
+const chromium = require('@sparticuz/chromium');
 const { defineSecret } = require('firebase-functions/params');
 
 admin.initializeApp();
@@ -11,12 +13,79 @@ const emailPassword = defineSecret('EMAIL_PASSWORD');
 const adminEmail = defineSecret('ADMIN_EMAIL');
 const openrouterKey = defineSecret('OPENROUTER_API_KEY');
 
+const DUCKDUCKGO_HTML_URL = 'https://duckduckgo.com/html/';
+const JINA_DUCKDUCKGO_PROXY_URL = 'https://r.jina.ai/http://duckduckgo.com/html/';
+const MAX_SEARCH_QUERIES = 8;
+const MAX_RESULTS_PER_QUERY = 8;
+const SEARCH_MARKET = 'us-en';
+const SEARCH_REQUEST_TIMEOUT_MS = 30000;
+const EXCLUDED_PROSPECT_DOMAINS = new Set([
+  'duckduckgo.com',
+  'google.com',
+  'bing.com',
+  'search.brave.com',
+  'facebook.com',
+  'instagram.com',
+  'linkedin.com',
+  'youtube.com',
+  'x.com',
+  'twitter.com',
+  'yelp.com',
+  'yellowpages.com',
+  'realtor.com',
+  'zillow.com',
+  'tripadvisor.com',
+  'mapquest.com',
+  'angi.com',
+  'thumbtack.com',
+  'houzz.com',
+  'homeguide.com',
+  'effectiveagents.com',
+  'ratemyagent.com',
+  'avvo.com',
+  'findlaw.com',
+  'lawyers.com',
+  'superlawyers.com',
+  'justia.com',
+  'zocdoc.com',
+  'opencare.com',
+  'goodfirms.co',
+  'bestlawfirms.com',
+  'bcgsearch.com',
+  'usnews.com',
+  'va.gov',
+  'bbb.org',
+  'wikipedia.org',
+  'opencorporates.com'
+]);
+
+async function launchBrowser() {
+  const executablePath = await chromium.executablePath();
+  if (!executablePath) {
+    throw new Error('Chromium executable path could not be resolved.');
+  }
+
+  console.log(`Launching bundled Chromium from: ${executablePath}`);
+
+  return puppeteer.launch({
+    executablePath,
+    headless: true,
+    defaultViewport: chromium.defaultViewport,
+    args: [...chromium.args, '--no-sandbox', '--disable-dev-shm-usage']
+  });
+}
+
 // ============================================================
 // 🔍 PART 1: FIND PROSPECTS (Google Maps Scraper)
 // ============================================================
 
 // Scheduled to run daily at 2am EST
-exports.scrapeGoogleMapsScheduled = functions.pubsub
+exports.scrapeGoogleMapsScheduled = functions
+  .runWith({
+    memory: '1GB',
+    timeoutSeconds: 540
+  })
+  .pubsub
   .schedule('0 2 * * *') // Daily at 2am
   .timeZone('America/Toronto')
   .onRun(async (context) => {
@@ -43,8 +112,6 @@ exports.scrapeGoogleMaps = functions.runWith({
 
 // Main scraping logic
 async function scrapeProspects() {
-  const puppeteer = require('puppeteer');
-
   const industries = [
     'real estate agent',
     'law firm',
@@ -57,109 +124,32 @@ async function scrapeProspects() {
     'accounting firm'
   ];
 
-  const cities = [
-    'Toronto', 'Ottawa', 'Mississauga', 'Brampton', 'Hamilton',
-    'London', 'Markham', 'Vaughan', 'Kitchener', 'Windsor'
-  ];
+  const { cities, country, defaultRegion } = getProspectingLocationConfig();
 
   let totalAdded = 0;
 
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const webProspects = await scrapeProspectsFromWebSearch(industries, cities, country, defaultRegion);
 
-    // Scrape 2 industry-city combinations (change this to scrape more)
-    for (let i = 0; i < Math.min(2, industries.length); i++) {
-      const industry = industries[i];
-      const city = cities[i % cities.length];
-
-      console.log(`Scraping ${industry} in ${city}...`);
-
-      const url = `https://www.google.com/maps/search/${encodeURIComponent(industry)}+in+${encodeURIComponent(city)}+Ontario`;
-
-      const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // Wait for results to load
-      await page.waitForTimeout(3000);
-
-      // Scroll to load more results
-      for (let scroll = 0; scroll < 3; scroll++) {
-        await page.evaluate(() => {
-          const resultsContainer = document.querySelector('[role="feed"]');
-          if (resultsContainer) {
-            resultsContainer.scrollTop = resultsContainer.scrollHeight;
-          }
-        });
-        await page.waitForTimeout(2000);
+    for (const prospect of webProspects) {
+      const inserted = await saveProspectIfNew(prospect);
+      if (inserted) {
+        totalAdded++;
       }
+    }
 
-      // Extract business data
-      const businesses = await page.evaluate(() => {
-        const results = [];
-        const items = document.querySelectorAll('[role="article"]');
+    // Keep Google Maps as fallback when search indexing doesn't return direct domains.
+    if (totalAdded === 0) {
+      console.log('Web search produced 0 new prospects. Falling back to Google Maps scraper...');
+      const mapProspects = await scrapeProspectsFromGoogleMaps(industries, cities, country, defaultRegion);
 
-        items.forEach((item, index) => {
-          if (index > 20) return; // Limit to 20 per search
-
-          const nameElement = item.querySelector('[class*="fontHeadline"]');
-          const name = nameElement ? nameElement.textContent : null;
-
-          const phoneElement = item.querySelector('[data-tooltip*="phone"]');
-          const phone = phoneElement ? phoneElement.getAttribute('aria-label')?.replace('Phone: ', '') : null;
-
-          const websiteElement = item.querySelector('a[data-tooltip*="website"]');
-          const website = websiteElement ? websiteElement.href : null;
-
-          const addressElement = item.querySelector('[class*="fontBody"]');
-          const address = addressElement ? addressElement.textContent : null;
-
-          if (name) {
-            results.push({ name, phone, website, address });
-          }
-        });
-
-        return results;
-      });
-
-      console.log(`Found ${businesses.length} businesses`);
-
-      // Save to Firestore
-      for (const business of businesses) {
-        // Check if already exists
-        const existingSnapshot = await admin.firestore()
-          .collection('prospects')
-          .where('company', '==', business.name)
-          .limit(1)
-          .get();
-
-        if (existingSnapshot.empty) {
-          await admin.firestore().collection('prospects').add({
-            company: business.name,
-            phone: business.phone,
-            website: business.website,
-            address: business.address,
-            industry: industry,
-            city: city,
-            province: 'Ontario',
-            country: 'Canada',
-            source: 'Google Maps',
-            status: 'Need Email',
-            needsWebsite: !business.website,
-            addedDate: admin.firestore.FieldValue.serverTimestamp(),
-            emailAttempts: 0,
-            emailSent: false
-          });
+      for (const prospect of mapProspects) {
+        const inserted = await saveProspectIfNew(prospect);
+        if (inserted) {
           totalAdded++;
         }
       }
-
-      await page.close();
     }
-
-    await browser.close();
 
     return {
       success: true,
@@ -173,11 +163,528 @@ async function scrapeProspects() {
   }
 }
 
+function getProspectingLocationConfig() {
+  const regionPreference = String(process.env.PROSPECT_TARGET_REGION || 'US').toUpperCase();
+  const useCanada = regionPreference === 'CA';
+
+  const usCities = [
+    'Miami, FL',
+    'Austin, TX',
+    'Dallas, TX',
+    'Atlanta, GA',
+    'Phoenix, AZ',
+    'Charlotte, NC',
+    'Tampa, FL',
+    'Nashville, TN',
+    'Denver, CO',
+    'Houston, TX'
+  ];
+
+  const canadaCities = [
+    'Toronto, ON',
+    'Ottawa, ON',
+    'Mississauga, ON',
+    'Brampton, ON',
+    'Hamilton, ON',
+    'London, ON',
+    'Markham, ON',
+    'Vaughan, ON',
+    'Kitchener, ON',
+    'Windsor, ON'
+  ];
+
+  return {
+    cities: useCanada ? canadaCities : usCities,
+    country: useCanada ? 'Canada' : 'USA',
+    defaultRegion: useCanada ? 'ON' : null
+  };
+}
+
+async function scrapeProspectsFromWebSearch(industries, cities, country, defaultRegion) {
+  const prospects = [];
+  const seenDomains = new Set();
+  const queryCount = Math.min(MAX_SEARCH_QUERIES, industries.length);
+
+  for (let i = 0; i < queryCount; i++) {
+    const industry = industries[i];
+    const cityLabel = cities[i % cities.length];
+    const query = buildSearchQuery(industry, cityLabel, country);
+
+    console.log(`Searching web for prospects: ${query}`);
+
+    try {
+      const results = await fetchSearchCandidates(query);
+      let accepted = 0;
+      const stats = {
+        parsed: results.length,
+        invalidUrl: 0,
+        noDomain: 0,
+        duplicate: 0,
+        excluded: 0,
+        nonCommercial: 0,
+        genericTitle: 0
+      };
+
+      for (const result of results) {
+        const destinationUrl = decodeDuckDuckGoLink(result.href);
+        const website = normalizeWebsite(destinationUrl);
+        if (!website) {
+          stats.invalidUrl++;
+          continue;
+        }
+
+        const domain = extractDomain(website);
+        if (!domain) {
+          stats.noDomain++;
+          continue;
+        }
+
+        if (seenDomains.has(domain)) {
+          stats.duplicate++;
+          continue;
+        }
+
+        if (isExcludedProspectDomain(domain)) {
+          stats.excluded++;
+          continue;
+        }
+
+        if (isNonCommercialDomain(domain)) {
+          stats.nonCommercial++;
+          continue;
+        }
+
+        if (isGenericSearchTitle(result.title)) {
+          stats.genericTitle++;
+          continue;
+        }
+
+        seenDomains.add(domain);
+        const { cityName, regionCode } = splitCityAndRegion(cityLabel);
+        const company = cleanCompanyName(result.title, domain);
+
+        prospects.push({
+          company,
+          phone: null,
+          website,
+          address: null,
+          industry,
+          city: cityName,
+          province: regionCode || defaultRegion,
+          country,
+          source: 'DuckDuckGo Search',
+          status: 'Need Email',
+          needsWebsite: false
+        });
+
+        accepted++;
+        if (accepted >= MAX_RESULTS_PER_QUERY) break;
+      }
+
+      console.log(
+        `Web prospects for "${industry}" in ${cityLabel}: accepted=${accepted}, parsed=${stats.parsed}, ` +
+        `invalidUrl=${stats.invalidUrl}, noDomain=${stats.noDomain}, duplicate=${stats.duplicate}, ` +
+        `excluded=${stats.excluded}, nonCommercial=${stats.nonCommercial}, genericTitle=${stats.genericTitle}`
+      );
+    } catch (error) {
+      console.error(`Web search scraping failed for "${query}":`, error.message || error);
+    }
+  }
+
+  console.log(`Total web prospects collected before dedupe: ${prospects.length}`);
+  return prospects;
+}
+
+function buildSearchQuery(industry, cityLabel, country) {
+  return `${industry} in ${cityLabel} ${country} official website contact -yelp -zillow -realtor -yellowpages -facebook`;
+}
+
+async function fetchSearchCandidates(query) {
+  const seen = new Set();
+  const candidates = [];
+
+  try {
+    const html = await fetchDuckDuckGoHtml(query);
+    const directResults = parseDuckDuckGoResults(html);
+    console.log(`DuckDuckGo direct results parsed for "${query}": ${directResults.length}`);
+    mergeSearchCandidates(candidates, seen, directResults);
+  } catch (error) {
+    console.error(`DuckDuckGo direct request failed for "${query}":`, error.message || error);
+  }
+
+  if (candidates.length < MAX_RESULTS_PER_QUERY) {
+    try {
+      const markdown = await fetchDuckDuckGoViaJina(query);
+      const jinaResults = parseJinaDuckDuckGoResults(markdown);
+      console.log(`DuckDuckGo via Jina results parsed for "${query}": ${jinaResults.length}`);
+      mergeSearchCandidates(candidates, seen, jinaResults);
+    } catch (error) {
+      console.error(`DuckDuckGo via Jina failed for "${query}":`, error.message || error);
+    }
+  }
+
+  return candidates;
+}
+
+function mergeSearchCandidates(target, seen, results) {
+  for (const result of results) {
+    const key = `${result.href}::${result.title}`.toLowerCase();
+    if (!result.href || !result.title || seen.has(key)) continue;
+    seen.add(key);
+    target.push(result);
+  }
+}
+
+async function fetchDuckDuckGoHtml(query) {
+  const url = `${DUCKDUCKGO_HTML_URL}?q=${encodeURIComponent(query)}&kl=${SEARCH_MARKET}`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; ProspectBot/1.0; +https://duckduckgo.com)',
+      'Accept-Language': 'en-US,en;q=0.9'
+    },
+    signal: AbortSignal.timeout(SEARCH_REQUEST_TIMEOUT_MS)
+  });
+
+  if (!response.ok) {
+    throw new Error(`DuckDuckGo returned HTTP ${response.status}`);
+  }
+
+  const html = await response.text();
+  if (isSearchChallengePage(html)) {
+    throw new Error('DuckDuckGo challenge page returned');
+  }
+
+  return html;
+}
+
+async function fetchDuckDuckGoViaJina(query) {
+  const url = `${JINA_DUCKDUCKGO_PROXY_URL}?q=${encodeURIComponent(query)}&kl=${SEARCH_MARKET}`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; ProspectBot/1.0)',
+      'Accept-Language': 'en-US,en;q=0.9'
+    },
+    signal: AbortSignal.timeout(SEARCH_REQUEST_TIMEOUT_MS)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Jina DuckDuckGo proxy returned HTTP ${response.status}`);
+  }
+
+  return response.text();
+}
+
+function parseDuckDuckGoResults(html) {
+  const results = [];
+  const regex = /<a[^>]*class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match = regex.exec(html);
+
+  while (match) {
+    const href = decodeHtmlEntities(match[1] || '');
+    const title = stripHtml(match[2] || '');
+    if (href && title) {
+      results.push({ href, title });
+    }
+    match = regex.exec(html);
+  }
+
+  return results;
+}
+
+function parseJinaDuckDuckGoResults(markdown) {
+  const results = [];
+  const regex = /(!?)\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi;
+  let match = regex.exec(markdown);
+
+  while (match) {
+    const isImageLink = match[1] === '!';
+    const title = stripHtml(match[2] || '');
+    const href = decodeHtmlEntities(match[3] || '');
+
+    if (!isImageLink && title && href && !href.includes('duckduckgo.com/html/')) {
+      results.push({ href, title });
+    }
+
+    match = regex.exec(markdown);
+  }
+
+  return results;
+}
+
+function isSearchChallengePage(html) {
+  const normalized = String(html || '').toLowerCase();
+  return normalized.includes('unfortunately, bots use duckduckgo too') ||
+    normalized.includes('automated requests') ||
+    normalized.includes('/anomaly.js');
+}
+
+function decodeDuckDuckGoLink(rawHref) {
+  if (!rawHref) return null;
+
+  let href = decodeHtmlEntities(rawHref).trim();
+  if (href.startsWith('//')) href = `https:${href}`;
+  if (href.startsWith('/')) href = `https://duckduckgo.com${href}`;
+
+  try {
+    const parsed = new URL(href);
+
+    if (parsed.hostname.includes('duckduckgo.com')) {
+      if (parsed.pathname.startsWith('/l/')) {
+        const redirected = parsed.searchParams.get('uddg');
+        return redirected ? decodeURIComponent(redirected) : null;
+      }
+      if (parsed.pathname.startsWith('/y.js')) {
+        return null;
+      }
+    }
+
+    return href;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWebsite(url) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    return `${parsed.protocol}//${hostname}`;
+  } catch {
+    return null;
+  }
+}
+
+function isExcludedProspectDomain(domain) {
+  const normalized = String(domain || '').toLowerCase();
+  if (!normalized) return true;
+
+  for (const blocked of EXCLUDED_PROSPECT_DOMAINS) {
+    if (normalized === blocked || normalized.endsWith(`.${blocked}`)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isNonCommercialDomain(domain) {
+  const normalized = String(domain || '').toLowerCase();
+  if (!normalized) return true;
+  return normalized.endsWith('.gov') || normalized.endsWith('.edu');
+}
+
+function splitCityAndRegion(cityLabel) {
+  const [cityPart, regionPart] = String(cityLabel || '').split(',');
+  const cityName = (cityPart || '').trim() || String(cityLabel || '').trim();
+  const regionCode = (regionPart || '').trim() || null;
+  return { cityName, regionCode };
+}
+
+function cleanCompanyName(rawTitle, fallbackDomain) {
+  let name = String(rawTitle || '').replace(/\s+/g, ' ').trim();
+
+  // Prefer first segment from common title formats.
+  const separators = [' | ', ' - ', ' — ', ' :: '];
+  for (const separator of separators) {
+    if (name.includes(separator)) {
+      const first = name.split(separator)[0].trim();
+      if (first.length > 2) {
+        name = first;
+      }
+      break;
+    }
+  }
+
+  if (!name || name.length < 3 || isGenericSearchTitle(name)) {
+    return companyNameFromDomain(fallbackDomain);
+  }
+
+  return name;
+}
+
+function isGenericSearchTitle(title) {
+  const lower = String(title || '').toLowerCase();
+  const genericMarkers = [
+    'top ',
+    'best ',
+    'find ',
+    'reviews',
+    'near me',
+    'compare',
+    'directory',
+    'list of'
+  ];
+
+  return genericMarkers.some(marker => lower.includes(marker));
+}
+
+function companyNameFromDomain(domain) {
+  const host = String(domain || '').toLowerCase();
+  const noSubdomain = host.split('.').slice(-2, -1)[0] || host;
+  return noSubdomain
+    .split('-')
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ') || 'Unknown Company';
+}
+
+function decodeHtmlEntities(text) {
+  return String(text || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/&apos;/g, '\'')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function stripHtml(text) {
+  return decodeHtmlEntities(text).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function scrapeProspectsFromGoogleMaps(industries, cities, country, defaultRegion) {
+  const prospects = [];
+  const browser = await launchBrowser();
+
+  try {
+    for (let i = 0; i < Math.min(2, industries.length); i++) {
+      const industry = industries[i];
+      const cityLabel = cities[i % cities.length];
+      const { cityName, regionCode } = splitCityAndRegion(cityLabel);
+
+      console.log(`Google Maps fallback: ${industry} in ${cityLabel}...`);
+
+      const url = `https://www.google.com/maps/search/${encodeURIComponent(industry)}+in+${encodeURIComponent(cityLabel)}+${encodeURIComponent(country)}`;
+      const page = await browser.newPage();
+
+      try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.waitForTimeout(3000);
+
+        for (let scroll = 0; scroll < 3; scroll++) {
+          await page.evaluate(() => {
+            const resultsContainer = document.querySelector('[role="feed"]');
+            if (resultsContainer) {
+              resultsContainer.scrollTop = resultsContainer.scrollHeight;
+            }
+          });
+          await page.waitForTimeout(2000);
+        }
+
+        const businesses = await page.evaluate(() => {
+          const results = [];
+          const items = document.querySelectorAll('[role="article"]');
+
+          items.forEach((item, index) => {
+            if (index > 20) return;
+
+            const nameElement = item.querySelector('[class*="fontHeadline"]');
+            const name = nameElement ? nameElement.textContent : null;
+            const phoneElement = item.querySelector('[data-tooltip*="phone"]');
+            const phone = phoneElement ? phoneElement.getAttribute('aria-label')?.replace('Phone: ', '') : null;
+            const websiteElement = item.querySelector('a[data-tooltip*="website"]');
+            const website = websiteElement ? websiteElement.href : null;
+            const addressElement = item.querySelector('[class*="fontBody"]');
+            const address = addressElement ? addressElement.textContent : null;
+
+            if (name) {
+              results.push({ name, phone, website, address });
+            }
+          });
+
+          return results;
+        });
+
+        console.log(`Google Maps fallback found ${businesses.length} businesses`);
+
+        for (const business of businesses) {
+          const normalizedWebsite = normalizeWebsite(business.website);
+          if (!normalizedWebsite) continue;
+
+          prospects.push({
+            company: business.name,
+            phone: business.phone || null,
+            website: normalizedWebsite,
+            address: business.address || null,
+            industry,
+            city: cityName,
+            province: regionCode || defaultRegion,
+            country,
+            source: 'Google Maps',
+            status: 'Need Email',
+            needsWebsite: false
+          });
+        }
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return prospects;
+}
+
+async function saveProspectIfNew(prospect) {
+  const collection = admin.firestore().collection('prospects');
+
+  if (prospect.website) {
+    const existingByWebsite = await collection
+      .where('website', '==', prospect.website)
+      .limit(1)
+      .get();
+
+    if (!existingByWebsite.empty) {
+      return false;
+    }
+  }
+
+  const existingByCompany = await collection
+    .where('company', '==', prospect.company)
+    .limit(1)
+    .get();
+
+  if (!existingByCompany.empty) {
+    return false;
+  }
+
+  await collection.add({
+    company: prospect.company,
+    phone: prospect.phone || null,
+    website: prospect.website || null,
+    address: prospect.address || null,
+    industry: prospect.industry,
+    city: prospect.city,
+    province: prospect.province || null,
+    country: prospect.country,
+    source: prospect.source,
+    status: 'Need Email',
+    needsWebsite: !prospect.website,
+    addedDate: admin.firestore.FieldValue.serverTimestamp(),
+    emailAttempts: 0,
+    emailSent: false
+  });
+
+  return true;
+}
+
 // ============================================================
 // 📧 PART 2: FIND EMAILS FOR PROSPECTS
 // ============================================================
 
-exports.findEmails = functions.pubsub
+exports.findEmails = functions
+  .runWith({
+    memory: '1GB',
+    timeoutSeconds: 540
+  })
+  .pubsub
   .schedule('0 3 * * *') // Runs at 3am daily
   .timeZone('America/Toronto')
   .onRun(async (context) => {
@@ -274,13 +781,8 @@ async function verifyEmailExists(email) {
 
 // Helper: Scrape website for email
 async function scrapeWebsiteForEmail(website) {
-  const puppeteer = require('puppeteer');
-
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox']
-    });
+    const browser = await launchBrowser();
 
     const page = await browser.newPage();
 
@@ -625,7 +1127,7 @@ function getFollowUpSubject(number, prospect) {
 // ============================================================
 
 exports.onLeadSubmit = functions
-  .runWith({ secrets: [emailUser, emailPassword, adminEmail] })
+  .runWith({ secrets: [emailUser, emailPassword, adminEmail, openrouterKey] })
   .firestore
   .document('leads/{leadId}')
   .onCreate(async (snap, context) => {
@@ -699,15 +1201,15 @@ exports.onLeadSubmit = functions
       followUpDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
     });
 
-    // Send alert if hot lead
-    if (priority === 'Hot') {
-      await sendHotLeadAlert(
-        lead,
-        emailUser.value(),
-        emailPassword.value(),
-        adminEmail.value()
-      );
-    }
+    // Send owner alert for every lead (Hot/Warm/Cold)
+    await sendOwnerLeadAlert(
+      lead,
+      emailUser.value(),
+      emailPassword.value(),
+      adminEmail.value(),
+      priority,
+      score
+    );
 
     // Send automated reply to client
     await sendAutoReplyToClient(
@@ -719,63 +1221,99 @@ exports.onLeadSubmit = functions
       score
     );
 
-    console.log(`Lead scored: ${lead.name} - ${priority} (${score}/100)`);
+    console.log(`Lead scored: ${lead.name || lead.full_name || lead.email} - ${priority} (${score}/100)`);
 
     return null;
   });
 
-// Send hot lead alert
-async function sendHotLeadAlert(lead, userEmail, userPassword, userAdminEmail) {
+// Send owner alert for every lead with priority-specific subject and guidance
+async function sendOwnerLeadAlert(lead, userEmail, userPassword, userAdminEmail, priority, score) {
+  const normalizedPassword = normalizeGmailAppPassword(userPassword);
+  if (!looksLikeGmailAppPassword(normalizedPassword)) {
+    console.warn('EMAIL_PASSWORD secret does not look like a 16-character Gmail App Password.');
+  }
+
   const transporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: { user: userEmail, pass: userPassword }
+    auth: { user: userEmail, pass: normalizedPassword }
   });
 
   try {
+    const leadName = lead.name || lead.full_name || 'Unknown Lead';
+    const leadEmail = lead.email || 'N/A';
+    const leadCompany = lead.company || 'Not provided';
+    const leadBudget = lead.budget || lead.budget_range || 'Not provided';
+    const leadTimeline = lead.timeline || 'Not provided';
+    const leadGoal = lead.goal || lead.primary_goal || 'Not provided';
+    const leadDetails = lead.details || lead.message || 'No details provided.';
+
+    const subjectPrefix =
+      priority === 'Hot'
+        ? '🔥 HOT LEAD'
+        : priority === 'Warm'
+          ? '⚡ WARM LEAD'
+          : '❄️ NEW LEAD';
+
+    const recommendedAction =
+      priority === 'Hot'
+        ? '⚡ ACTION REQUIRED: Contact within 1 hour for best conversion rate!'
+        : priority === 'Warm'
+          ? '📌 Recommended: Follow up within 24 hours.'
+          : '🗂 Keep in nurture sequence with a personalized follow-up.';
+
     await transporter.sendMail({
       from: userEmail,
       to: userAdminEmail,
-      subject: `🔥 HOT LEAD: ${lead.name} - ${lead.budget}`,
-      text: `HIGH PRIORITY LEAD RECEIVED!
+      subject: `${subjectPrefix}: ${leadName} - ${leadBudget}`,
+      text: `NEW LEAD RECEIVED!
 
-Name: ${lead.name}
-Email: ${lead.email}
-Company: ${lead.company}
-Budget: ${lead.budget}
-Timeline: ${lead.timeline}
-Goal: ${lead.goal}
+Priority: ${priority}
+Score: ${score}/100
 
-Score: ${lead.score}/100
+Name: ${leadName}
+Email: ${leadEmail}
+Company: ${leadCompany}
+Budget: ${leadBudget}
+Timeline: ${leadTimeline}
+Goal: ${leadGoal}
 
 Details:
-${lead.details}
+${leadDetails}
 
-⚡ ACTION REQUIRED: Contact within 1 hour for best conversion rate!
+${recommendedAction}
 
 Reply to this email to contact them directly.`
     });
 
-    console.log(`🔥 Hot lead alert sent for ${lead.name}`);
+    console.log(`📩 Owner lead alert sent (${priority}) for ${leadName}`);
   } catch (error) {
-    console.error('Error sending hot lead alert:', error);
+    console.error('Error sending owner lead alert:', error);
   }
 }
 
 // Send automated reply to client
 async function sendAutoReplyToClient(lead, userEmail, userPassword, apiKey, priority, score) {
+  const normalizedPassword = normalizeGmailAppPassword(userPassword);
+  if (!looksLikeGmailAppPassword(normalizedPassword)) {
+    console.warn('EMAIL_PASSWORD secret does not look like a 16-character Gmail App Password.');
+  }
+
   const transporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: { user: userEmail, pass: userPassword }
+    auth: { user: userEmail, pass: normalizedPassword }
   });
 
   try {
+    const nameSource = lead.firstName || lead.name || lead.full_name || '';
+    const firstName = String(nameSource).trim().split(' ')[0] || 'there';
+
     // Generate personalized response based on message content
     const replyContent = await generateAutoReply(lead, apiKey, priority, score);
 
     // Determine subject based on priority
     const subject = priority === 'Hot'
-      ? `Thanks ${lead.firstName || lead.name.split(' ')[0]}! Let's talk soon 🚀`
-      : `Thanks for reaching out, ${lead.firstName || lead.name.split(' ')[0]}!`;
+      ? `Thanks ${firstName}! Let's talk soon 🚀`
+      : `Thanks for reaching out, ${firstName}!`;
 
     await transporter.sendMail({
       from: `Jeffery Addae <${userEmail}>`,
@@ -793,7 +1331,8 @@ async function sendAutoReplyToClient(lead, userEmail, userPassword, apiKey, prio
 
 // Generate personalized auto-reply with AI
 async function generateAutoReply(lead, apiKey, priority, score) {
-  const firstName = lead.firstName || lead.name.split(' ')[0];
+  const nameSource = lead.firstName || lead.name || lead.full_name || '';
+  const firstName = String(nameSource).trim().split(' ')[0] || 'there';
   const message = lead.details || lead.message || '';
   const goal = lead.goal || '';
   const timeline = lead.timeline || '';
@@ -937,4 +1476,12 @@ ${urgentNote}
   };
 
   return templates[messageType] || templates.general;
+}
+
+function normalizeGmailAppPassword(password) {
+  return String(password || '').replace(/\s+/g, '');
+}
+
+function looksLikeGmailAppPassword(password) {
+  return typeof password === 'string' && password.length === 16;
 }
