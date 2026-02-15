@@ -4,11 +4,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "2f2d5f8b-7d52-4270-9352-b8fc66fd03a1",
+  "versionId": "8ed2f31d-136c-47b8-95f9-031da7c9e0b8",
   "nodes": [
     {
       "parameters": {
-        "path": "lead-intake-v2",
+        "path": "lead-intake-v3",
         "httpMethod": "POST",
         "responseMode": "onReceived"
       },
@@ -20,7 +20,7 @@
         220,
         320
       ],
-      "webhookId": "lead-intake-v2"
+      "webhookId": "lead-intake-v3"
     },
     {
       "parameters": {
@@ -43,63 +43,65 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
       "position": [
-        440,
+        450,
         320
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const urgency = String(item.json.urgency || 'normal').toLowerCase();\n  const source = String(item.json.source || 'unknown').toLowerCase();\n  const tools = String(item.json.tools || item.json.toolsInvolved || '').toLowerCase();\n\n  let score = 35;\n  if (budget >= 5000) score += 25;\n  if (budget >= 12000) score += 10;\n  if (urgency.includes('urgent') || urgency.includes('high')) score += 15;\n  if (source.includes('referral')) score += 8;\n  if (tools.includes('hubspot') || tools.includes('salesforce')) score += 7;\n\n  const deterministicPriority = score >= 75 ? 'hot' : score >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore: Math.min(score, 100),\n      deterministicPriority\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const budget = Number(item.json.budget || 0);\n  const urgency = String(item.json.urgency || 'normal').toLowerCase();\n  const source = String(item.json.source || 'unknown').toLowerCase();\n\n  let deterministicScore = 35;\n  if (budget >= 5000) deterministicScore += 25;\n  if (budget >= 12000) deterministicScore += 10;\n  if (urgency.includes('high') || urgency.includes('urgent')) deterministicScore += 15;\n  if (source.includes('referral')) deterministicScore += 10;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore: Math.min(deterministicScore, 100),\n      deterministicPriority: deterministicScore >= 75 ? 'hot' : deterministicScore >= 55 ? 'warm' : 'cold',\n    },\n  };\n});"
       },
       "id": "deterministic_lead_scoring",
       "name": "Deterministic Lead Scoring",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
+        700,
         320
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://openrouter.ai/api/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You score inbound B2B leads. Return strict JSON with keys aiScore (0-100 number), priority (hot|warm|cold), rationale (short string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+        "promptType": "define",
+        "text": "={{'You are a B2B lead qualification agent. Return strict JSON with keys aiScore (0-100), priority (hot|warm|cold), summary (string). Lead payload: ' + JSON.stringify($json)}}",
+        "options": {}
       },
-      "id": "ai_qualification",
-      "name": "AI Qualification",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "ai_lead_qualifier",
+      "name": "AI Lead Qualifier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
       "position": [
-        900,
+        940,
         220
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? raw.data?.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiScore: Number(ai.aiScore ?? ai.score ?? 0),\n      aiPriority: String(ai.priority || '').toLowerCase(),\n      aiRationale: String(ai.rationale || 'ai_response_unavailable')\n    }\n  };\n});"
+        "model": {
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
       },
-      "id": "parse_ai_qualification",
-      "name": "Parse AI Qualification",
+      "id": "openai_chat_model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+      },
+      "id": "parse_ai_output",
+      "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
+        1160,
         220
       ]
     },
@@ -107,25 +109,25 @@
       "parameters": {
         "mode": "combine"
       },
-      "id": "merge_scoring_signals",
-      "name": "Merge Scoring Signals",
+      "id": "merge_ai_with_rules",
+      "name": "Merge AI with Rules",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1120,
+        1160,
         360
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const deterministic = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const blended = aiScore > 0\n    ? Math.round((deterministic * 0.6) + (aiScore * 0.4))\n    : deterministic;\n\n  const priority = blended >= 75 ? 'hot' : blended >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      leadScore: blended,\n      priority,\n      scoringSource: aiScore > 0 ? 'blended_ai_plus_rules' : 'deterministic_rules_only'\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const leadScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))\n    : deterministicScore;\n\n  const priority = leadScore >= 75 ? 'hot' : leadScore >= 55 ? 'warm' : 'cold';\n\n  return {\n    json: {\n      ...item.json,\n      leadScore,\n      priority,\n      aiSummary: item.json.aiSummary || 'deterministic fallback used',\n    },\n  };\n});"
       },
       "id": "final_priority_decision",
       "name": "Final Priority Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1340,
+        1380,
         360
       ]
     },
@@ -141,64 +143,108 @@
           ]
         }
       },
-      "id": "if_hot_lead",
+      "id": "hot_lead_check",
       "name": "Hot Lead?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1560,
+        1600,
         360
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/REPLACE/SALES/WEBHOOK",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\":\"🔥 HOT lead: {{$json.firstName || $json.name || \"Unknown\"}} ({{$json.email || \"no-email\"}}) score {{$json.leadScore}}\"}"
+        "resource": "contact",
+        "operation": "upsert",
+        "email": "={{$json.email || \"lead@example.com\"}}",
+        "additionalFields": {}
       },
-      "id": "send_sales_alert",
-      "name": "Send Sales Alert",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "hubspot_upsert_contact",
+      "name": "HubSpot Upsert Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
       "position": [
-        1780,
-        240
+        1820,
+        450
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://example-crm.local/api/leads/upsert",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{$json}}"
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "https://www.notion.so/00000000000000000000000000000000"
+        },
+        "title": "={{\"Lead: \" + ($json.firstName || $json.name || \"Unknown\") + \" | \" + ($json.priority || \"cold\")}}",
+        "simple": true
       },
-      "id": "upsert_lead_crm",
-      "name": "Upsert Lead in CRM",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "notion_record_lead",
+      "name": "Notion Record Lead",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
-        1780,
-        420
+        1820,
+        320
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://example-mail.local/api/send",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"to\":\"owner@jefferyaddae.com\",\"subject\":\"New {{$json.priority}} lead scored {{$json.leadScore}}\",\"payload\":$json}"
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"🔥 HOT lead: \" + ($json.email || \"no-email\") + \" | score \" + ($json.leadScore || 0)}}"
       },
-      "id": "owner_notification",
-      "name": "Owner Email Notification",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "slack_hot_lead_alert",
+      "name": "Slack Hot Lead Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        2000,
-        420
+        1820,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"New lead: \" + ($json.email || \"no-email\") + \" | priority \" + ($json.priority || \"cold\")}}"
+      },
+      "id": "slack_standard_lead_alert",
+      "name": "Slack Standard Lead Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1820,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{\"owner@example.com\"}}",
+        "subject": "Lead Qualification Summary",
+        "message": "={{\"Priority: \" + ($json.priority || \"cold\") + \"\\nScore: \" + ($json.leadScore || 0) + \"\\nAI: \" + ($json.aiSummary || \"N/A\")}}"
+      },
+      "id": "gmail_owner_lead_summary",
+      "name": "Gmail Owner Lead Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2050,
+        450
       ]
     }
   ],
@@ -229,43 +275,54 @@
       "main": [
         [
           {
-            "node": "AI Qualification",
+            "node": "AI Lead Qualifier",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Merge Scoring Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Qualification": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Lead Qualifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Lead Qualifier": {
       "main": [
         [
           {
-            "node": "Parse AI Qualification",
+            "node": "Parse AI Output",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse AI Qualification": {
+    "Parse AI Output": {
       "main": [
         [
           {
-            "node": "Merge Scoring Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 1
           }
         ]
       ]
     },
-    "Merge Scoring Signals": {
+    "Merge AI with Rules": {
       "main": [
         [
           {
@@ -291,30 +348,45 @@
       "main": [
         [
           {
-            "node": "Send Sales Alert",
+            "node": "Slack Hot Lead Alert",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Upsert Lead in CRM",
+            "node": "Notion Record Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HubSpot Upsert Contact",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Upsert Lead in CRM",
+            "node": "Slack Standard Lead Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion Record Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HubSpot Upsert Contact",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Upsert Lead in CRM": {
+    "HubSpot Upsert Contact": {
       "main": [
         [
           {
-            "node": "Owner Email Notification",
+            "node": "Gmail Owner Lead Summary",
             "type": "main",
             "index": 0
           }

@@ -3,315 +3,438 @@ import { dirname, join } from 'node:path';
 
 const rootDir = process.cwd();
 
-const workflows = [
-  {
-    fileName: 'lead-intake-qualification-workflow.json',
-    repoDir: 'n8n-lead-intake-qualification-system',
-    workflow: {
-      name: 'Lead Intake Qualification Pipeline',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: '2f2d5f8b-7d52-4270-9352-b8fc66fd03a1',
-      nodes: [
-        {
-          parameters: {
-            path: 'lead-intake-v2',
-            httpMethod: 'POST',
-            responseMode: 'onReceived'
+const notionDatabasePlaceholder = 'https://www.notion.so/00000000000000000000000000000000';
+const slackChannelPlaceholder = 'C01234567';
+const ownerEmailPlaceholder = 'owner@example.com';
+
+const parseAiOutputCode = `return $input.all().map((item) => {
+  const rawCandidate =
+    item.json.output ??
+    item.json.text ??
+    item.json.response ??
+    item.json.result ??
+    item.json;
+
+  let parsed = {};
+
+  if (typeof rawCandidate === 'string') {
+    try {
+      parsed = JSON.parse(rawCandidate);
+    } catch (error) {
+      parsed = { summary: rawCandidate };
+    }
+  } else if (rawCandidate && typeof rawCandidate === 'object') {
+    parsed = rawCandidate;
+  }
+
+  const pickNumber = (...keys) => {
+    for (const key of keys) {
+      const value = Number(parsed[key]);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+    return 0;
+  };
+
+  const pickString = (...keys) => {
+    for (const key of keys) {
+      const value = parsed[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  };
+
+  return {
+    json: {
+      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),
+      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),
+      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',
+      aiPayload: parsed,
+    },
+  };
+});`;
+
+function webhookNode({ id, name, path, position }) {
+  return {
+    parameters: {
+      path,
+      httpMethod: 'POST',
+      responseMode: 'onReceived',
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.webhook',
+    typeVersion: 1,
+    position,
+    webhookId: path,
+  };
+}
+
+function scheduleNode({ id, name, hoursInterval, position }) {
+  return {
+    parameters: {
+      rule: {
+        interval: [{ field: 'hours', hoursInterval }],
+      },
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.scheduleTrigger',
+    typeVersion: 1,
+    position,
+  };
+}
+
+function setNode({ id, name, fields, position }) {
+  return {
+    parameters: {
+      keepOnlySet: false,
+      values: {
+        string: fields.map((field) => ({ name: field.name, value: field.value })),
+      },
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.set',
+    typeVersion: 3,
+    position,
+  };
+}
+
+function codeNode({ id, name, jsCode, position }) {
+  return {
+    parameters: { jsCode },
+    id,
+    name,
+    type: 'n8n-nodes-base.code',
+    typeVersion: 2,
+    position,
+  };
+}
+
+function agentNode({ id, name, prompt, position }) {
+  return {
+    parameters: {
+      promptType: 'define',
+      text: prompt,
+      options: {},
+    },
+    id,
+    name,
+    type: '@n8n/n8n-nodes-langchain.agent',
+    typeVersion: 3.1,
+    position,
+  };
+}
+
+function modelNode({ id, name, position }) {
+  return {
+    parameters: {
+      model: {
+        mode: 'list',
+        value: 'gpt-4.1-mini',
+      },
+      options: {},
+    },
+    id,
+    name,
+    type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+    typeVersion: 1.3,
+    position,
+  };
+}
+
+function mergeNode({ id, name, position }) {
+  return {
+    parameters: { mode: 'combine' },
+    id,
+    name,
+    type: 'n8n-nodes-base.merge',
+    typeVersion: 3,
+    position,
+  };
+}
+
+function ifNumberNode({ id, name, valueExpr, threshold, position }) {
+  return {
+    parameters: {
+      conditions: {
+        number: [
+          {
+            value1: valueExpr,
+            operation: 'largerEqual',
+            value2: threshold,
           },
-          id: 'lead_webhook',
-          name: 'Lead Webhook',
-          type: 'n8n-nodes-base.webhook',
-          typeVersion: 1,
-          position: [220, 320],
-          webhookId: 'lead-intake-v2'
-        },
-        {
-          parameters: {
-            keepOnlySet: false,
-            values: {
-              string: [
-                { name: 'pipeline', value: 'lead-intake-qualification' },
-                { name: 'receivedAt', value: '={{new Date().toISOString()}}' }
-              ]
-            }
-          },
-          id: 'normalize_lead_payload',
-          name: 'Normalize Lead Payload',
-          type: 'n8n-nodes-base.set',
-          typeVersion: 3,
-          position: [440, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
+        ],
+      },
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.if',
+    typeVersion: 2,
+    position,
+  };
+}
+
+function slackPostNode({ id, name, textExpr, position }) {
+  return {
+    parameters: {
+      resource: 'message',
+      operation: 'post',
+      select: 'channel',
+      channelId: {
+        mode: 'id',
+        value: slackChannelPlaceholder,
+      },
+      messageType: 'text',
+      text: textExpr,
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.slack',
+    typeVersion: 2.4,
+    position,
+  };
+}
+
+function notionCreatePageNode({ id, name, titleExpr, position }) {
+  return {
+    parameters: {
+      resource: 'databasePage',
+      operation: 'create',
+      databaseId: {
+        mode: 'url',
+        value: notionDatabasePlaceholder,
+      },
+      title: titleExpr,
+      simple: true,
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.notion',
+    typeVersion: 2.2,
+    position,
+  };
+}
+
+function gmailSendNode({ id, name, toExpr, subject, messageExpr, position }) {
+  return {
+    parameters: {
+      resource: 'message',
+      operation: 'send',
+      sendTo: toExpr,
+      subject,
+      message: messageExpr,
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.gmail',
+    typeVersion: 2.2,
+    position,
+  };
+}
+
+function hubspotContactUpsertNode({ id, name, emailExpr, position }) {
+  return {
+    parameters: {
+      resource: 'contact',
+      operation: 'upsert',
+      email: emailExpr,
+      additionalFields: {},
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.hubspot',
+    typeVersion: 2.2,
+    position,
+  };
+}
+
+function hubspotDealSearchNode({ id, name, position }) {
+  return {
+    parameters: {
+      resource: 'deal',
+      operation: 'search',
+      additionalFields: {},
+    },
+    id,
+    name,
+    type: 'n8n-nodes-base.hubspot',
+    typeVersion: 2.2,
+    position,
+  };
+}
+
+function leadWorkflow() {
+  const nodes = [
+    webhookNode({ id: 'lead_webhook', name: 'Lead Webhook', path: 'lead-intake-v3', position: [220, 320] }),
+    setNode({
+      id: 'normalize_lead_payload',
+      name: 'Normalize Lead Payload',
+      fields: [
+        { name: 'pipeline', value: 'lead-intake-qualification' },
+        { name: 'receivedAt', value: '={{new Date().toISOString()}}' },
+      ],
+      position: [450, 320],
+    }),
+    codeNode({
+      id: 'deterministic_lead_scoring',
+      name: 'Deterministic Lead Scoring',
+      position: [700, 320],
+      jsCode: `return $input.all().map((item) => {
   const budget = Number(item.json.budget || 0);
   const urgency = String(item.json.urgency || 'normal').toLowerCase();
   const source = String(item.json.source || 'unknown').toLowerCase();
-  const tools = String(item.json.tools || item.json.toolsInvolved || '').toLowerCase();
 
-  let score = 35;
-  if (budget >= 5000) score += 25;
-  if (budget >= 12000) score += 10;
-  if (urgency.includes('urgent') || urgency.includes('high')) score += 15;
-  if (source.includes('referral')) score += 8;
-  if (tools.includes('hubspot') || tools.includes('salesforce')) score += 7;
-
-  const deterministicPriority = score >= 75 ? 'hot' : score >= 55 ? 'warm' : 'cold';
+  let deterministicScore = 35;
+  if (budget >= 5000) deterministicScore += 25;
+  if (budget >= 12000) deterministicScore += 10;
+  if (urgency.includes('high') || urgency.includes('urgent')) deterministicScore += 15;
+  if (source.includes('referral')) deterministicScore += 10;
 
   return {
     json: {
       ...item.json,
-      deterministicScore: Math.min(score, 100),
-      deterministicPriority
-    }
+      deterministicScore: Math.min(deterministicScore, 100),
+      deterministicPriority: deterministicScore >= 75 ? 'hot' : deterministicScore >= 55 ? 'warm' : 'cold',
+    },
   };
-});`
-          },
-          id: 'deterministic_lead_scoring',
-          name: 'Deterministic Lead Scoring',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [660, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.1,"messages":[{"role":"system","content":"You score inbound B2B leads. Return strict JSON with keys aiScore (0-100 number), priority (hot|warm|cold), rationale (short string)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_qualification',
-          name: 'AI Qualification',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [900, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
-
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? raw.data?.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
-
-  return {
-    json: {
-      aiScore: Number(ai.aiScore ?? ai.score ?? 0),
-      aiPriority: String(ai.priority || '').toLowerCase(),
-      aiRationale: String(ai.rationale || 'ai_response_unavailable')
-    }
-  };
-});`
-          },
-          id: 'parse_ai_qualification',
-          name: 'Parse AI Qualification',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1120, 220]
-        },
-        {
-          parameters: {
-            mode: 'combine'
-          },
-          id: 'merge_scoring_signals',
-          name: 'Merge Scoring Signals',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1120, 360]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const deterministic = Number(item.json.deterministicScore || 0);
+});`,
+    }),
+    agentNode({
+      id: 'ai_lead_qualifier',
+      name: 'AI Lead Qualifier',
+      prompt:
+        "={{'You are a B2B lead qualification agent. Return strict JSON with keys aiScore (0-100), priority (hot|warm|cold), summary (string). Lead payload: ' + JSON.stringify($json)}}",
+      position: [940, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [940, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [1160, 220] }),
+    mergeNode({ id: 'merge_ai_with_rules', name: 'Merge AI with Rules', position: [1160, 360] }),
+    codeNode({
+      id: 'final_priority_decision',
+      name: 'Final Priority Decision',
+      position: [1380, 360],
+      jsCode: `return $input.all().map((item) => {
+  const deterministicScore = Number(item.json.deterministicScore || 0);
   const aiScore = Number(item.json.aiScore || 0);
-  const blended = aiScore > 0
-    ? Math.round((deterministic * 0.6) + (aiScore * 0.4))
-    : deterministic;
+  const leadScore = aiScore > 0
+    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))
+    : deterministicScore;
 
-  const priority = blended >= 75 ? 'hot' : blended >= 55 ? 'warm' : 'cold';
+  const priority = leadScore >= 75 ? 'hot' : leadScore >= 55 ? 'warm' : 'cold';
 
   return {
     json: {
       ...item.json,
-      leadScore: blended,
+      leadScore,
       priority,
-      scoringSource: aiScore > 0 ? 'blended_ai_plus_rules' : 'deterministic_rules_only'
-    }
+      aiSummary: item.json.aiSummary || 'deterministic fallback used',
+    },
   };
-});`
-          },
-          id: 'final_priority_decision',
-          name: 'Final Priority Decision',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1340, 360]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.leadScore}}',
-                  operation: 'largerEqual',
-                  value2: 75
-                }
-              ]
-            }
-          },
-          id: 'if_hot_lead',
-          name: 'Hot Lead?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1560, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/SALES/WEBHOOK',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"🔥 HOT lead: {{$json.firstName || $json.name || \"Unknown\"}} ({{$json.email || \"no-email\"}}) score {{$json.leadScore}}"}'
-          },
-          id: 'send_sales_alert',
-          name: 'Send Sales Alert',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 240]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-crm.local/api/leads/upsert',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'upsert_lead_crm',
-          name: 'Upsert Lead in CRM',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 420]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-mail.local/api/send',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"to":"owner@jefferyaddae.com","subject":"New {{$json.priority}} lead scored {{$json.leadScore}}","payload":$json}'
-          },
-          id: 'owner_notification',
-          name: 'Owner Email Notification',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2000, 420]
-        }
+});`,
+    }),
+    ifNumberNode({ id: 'hot_lead_check', name: 'Hot Lead?', valueExpr: '={{$json.leadScore}}', threshold: 75, position: [1600, 360] }),
+    hubspotContactUpsertNode({
+      id: 'hubspot_upsert_contact',
+      name: 'HubSpot Upsert Contact',
+      emailExpr: '={{$json.email || "lead@example.com"}}',
+      position: [1820, 450],
+    }),
+    notionCreatePageNode({
+      id: 'notion_record_lead',
+      name: 'Notion Record Lead',
+      titleExpr: '={{"Lead: " + ($json.firstName || $json.name || "Unknown") + " | " + ($json.priority || "cold")}}',
+      position: [1820, 320],
+    }),
+    slackPostNode({
+      id: 'slack_hot_lead_alert',
+      name: 'Slack Hot Lead Alert',
+      textExpr: '={{"🔥 HOT lead: " + ($json.email || "no-email") + " | score " + ($json.leadScore || 0)}}',
+      position: [1820, 180],
+    }),
+    slackPostNode({
+      id: 'slack_standard_lead_alert',
+      name: 'Slack Standard Lead Alert',
+      textExpr: '={{"New lead: " + ($json.email || "no-email") + " | priority " + ($json.priority || "cold")}}',
+      position: [1820, 560],
+    }),
+    gmailSendNode({
+      id: 'gmail_owner_lead_summary',
+      name: 'Gmail Owner Lead Summary',
+      toExpr: `={{${JSON.stringify(ownerEmailPlaceholder)}}}`,
+      subject: 'Lead Qualification Summary',
+      messageExpr: '={{"Priority: " + ($json.priority || "cold") + "\\nScore: " + ($json.leadScore || 0) + "\\nAI: " + ($json.aiSummary || "N/A")}}',
+      position: [2050, 450],
+    }),
+  ];
+
+  const connections = {
+    'Lead Webhook': { main: [[{ node: 'Normalize Lead Payload', type: 'main', index: 0 }]] },
+    'Normalize Lead Payload': { main: [[{ node: 'Deterministic Lead Scoring', type: 'main', index: 0 }]] },
+    'Deterministic Lead Scoring': {
+      main: [
+        [{ node: 'AI Lead Qualifier', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Rules', type: 'main', index: 0 }],
       ],
-      connections: {
-        'Lead Webhook': {
-          main: [[{ node: 'Normalize Lead Payload', type: 'main', index: 0 }]]
-        },
-        'Normalize Lead Payload': {
-          main: [[{ node: 'Deterministic Lead Scoring', type: 'main', index: 0 }]]
-        },
-        'Deterministic Lead Scoring': {
-          main: [
-            [{ node: 'AI Qualification', type: 'main', index: 0 }],
-            [{ node: 'Merge Scoring Signals', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Qualification': {
-          main: [[{ node: 'Parse AI Qualification', type: 'main', index: 0 }]]
-        },
-        'Parse AI Qualification': {
-          main: [[{ node: 'Merge Scoring Signals', type: 'main', index: 1 }]]
-        },
-        'Merge Scoring Signals': {
-          main: [[{ node: 'Final Priority Decision', type: 'main', index: 0 }]]
-        },
-        'Final Priority Decision': {
-          main: [[{ node: 'Hot Lead?', type: 'main', index: 0 }]]
-        },
-        'Hot Lead?': {
-          main: [
-            [
-              { node: 'Send Sales Alert', type: 'main', index: 0 },
-              { node: 'Upsert Lead in CRM', type: 'main', index: 0 }
-            ],
-            [{ node: 'Upsert Lead in CRM', type: 'main', index: 0 }]
-          ]
-        },
-        'Upsert Lead in CRM': {
-          main: [[{ node: 'Owner Email Notification', type: 'main', index: 0 }]]
-        }
-      }
-    }
-  },
-  {
-    fileName: 'internal-ops-routing-approvals-workflow.json',
-    repoDir: 'n8n-internal-ops-routing-approvals',
-    workflow: {
-      name: 'Internal Ops Routing and Approvals',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: '66e7fbf8-f3df-4456-8d20-7d17956ef31f',
-      nodes: [
-        {
-          parameters: {
-            path: 'ops-request-v2',
-            httpMethod: 'POST',
-            responseMode: 'onReceived'
-          },
-          id: 'ops_request_webhook',
-          name: 'Ops Request Webhook',
-          type: 'n8n-nodes-base.webhook',
-          typeVersion: 1,
-          position: [220, 320],
-          webhookId: 'ops-request-v2'
-        },
-        {
-          parameters: {
-            keepOnlySet: false,
-            values: {
-              string: [
-                { name: 'status', value: 'intake_received' },
-                { name: 'requestReceivedAt', value: '={{new Date().toISOString()}}' }
-              ]
-            }
-          },
-          id: 'normalize_ops_request',
-          name: 'Normalize Ops Request',
-          type: 'n8n-nodes-base.set',
-          typeVersion: 3,
-          position: [440, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Lead Qualifier', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Lead Qualifier': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Rules', type: 'main', index: 1 }]] },
+    'Merge AI with Rules': { main: [[{ node: 'Final Priority Decision', type: 'main', index: 0 }]] },
+    'Final Priority Decision': { main: [[{ node: 'Hot Lead?', type: 'main', index: 0 }]] },
+    'Hot Lead?': {
+      main: [
+        [
+          { node: 'Slack Hot Lead Alert', type: 'main', index: 0 },
+          { node: 'Notion Record Lead', type: 'main', index: 0 },
+          { node: 'HubSpot Upsert Contact', type: 'main', index: 0 },
+        ],
+        [
+          { node: 'Slack Standard Lead Alert', type: 'main', index: 0 },
+          { node: 'Notion Record Lead', type: 'main', index: 0 },
+          { node: 'HubSpot Upsert Contact', type: 'main', index: 0 },
+        ],
+      ],
+    },
+    'HubSpot Upsert Contact': { main: [[{ node: 'Gmail Owner Lead Summary', type: 'main', index: 0 }]] },
+  };
+
+  return {
+    name: 'Lead Intake Qualification Pipeline',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: '8ed2f31d-136c-47b8-95f9-031da7c9e0b8',
+    nodes,
+    connections,
+  };
+}
+
+function internalOpsWorkflow() {
+  const nodes = [
+    webhookNode({ id: 'ops_request_webhook', name: 'Ops Request Webhook', path: 'ops-request-v3', position: [220, 320] }),
+    setNode({
+      id: 'normalize_ops_request',
+      name: 'Normalize Ops Request',
+      fields: [
+        { name: 'requestReceivedAt', value: '={{new Date().toISOString()}}' },
+        { name: 'status', value: 'intake_received' },
+      ],
+      position: [450, 320],
+    }),
+    codeNode({
+      id: 'deterministic_ops_routing',
+      name: 'Deterministic Ops Routing',
+      position: [700, 320],
+      jsCode: `return $input.all().map((item) => {
   const requestType = String(item.json.requestType || 'general').toLowerCase();
   const priority = String(item.json.priority || 'normal').toLowerCase();
-  const impact = String(item.json.impact || 'medium').toLowerCase();
+
+  let deterministicScore = 40;
+  if (priority.includes('high') || priority.includes('urgent')) deterministicScore += 25;
+  if (requestType.includes('finance')) deterministicScore += 15;
+  if (requestType.includes('security')) deterministicScore += 20;
 
   const approver = requestType.includes('finance')
     ? 'finance-manager'
@@ -319,1264 +442,688 @@ const workflows = [
     ? 'security-lead'
     : 'ops-manager';
 
-  let routingScore = 35;
-  if (priority.includes('high') || priority.includes('urgent')) routingScore += 25;
-  if (impact.includes('high') || impact.includes('critical')) routingScore += 20;
-  if (requestType.includes('access') || requestType.includes('security')) routingScore += 10;
-
   return {
     json: {
       ...item.json,
+      deterministicScore,
       approver,
-      slaHours: routingScore >= 75 ? 4 : routingScore >= 55 ? 12 : 24,
-      routingScore
-    }
+      slaHours: deterministicScore >= 75 ? 4 : deterministicScore >= 55 ? 12 : 24,
+    },
   };
-});`
-          },
-          id: 'policy_routing_engine',
-          name: 'Policy Routing Engine',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [670, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.1,"messages":[{"role":"system","content":"You review internal ops requests for escalation risk. Return JSON: riskScore (0-100), escalationReason (string), shouldEscalate (true|false)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_risk_reviewer',
-          name: 'AI Risk Reviewer',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [900, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
+});`,
+    }),
+    agentNode({
+      id: 'ai_ops_risk_agent',
+      name: 'AI Ops Risk Agent',
+      prompt:
+        "={{'You classify internal ops requests for escalation risk. Return strict JSON with keys aiScore (0-100), priority (escalate|standard), summary (string). Request payload: ' + JSON.stringify($json)}}",
+      position: [940, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [940, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [1160, 220] }),
+    mergeNode({ id: 'merge_ai_with_rules', name: 'Merge AI with Rules', position: [1160, 360] }),
+    codeNode({
+      id: 'final_ops_decision',
+      name: 'Final Ops Decision',
+      position: [1380, 360],
+      jsCode: `return $input.all().map((item) => {
+  const deterministicScore = Number(item.json.deterministicScore || 0);
+  const aiScore = Number(item.json.aiScore || 0);
+  const escalationScore = aiScore > 0
+    ? Math.round((deterministicScore * 0.7) + (aiScore * 0.3))
+    : deterministicScore;
 
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
-
-  return {
-    json: {
-      aiRiskScore: Number(ai.riskScore ?? 0),
-      shouldEscalateAi: ai.shouldEscalate === true,
-      escalationReasonAi: String(ai.escalationReason || 'ai_response_unavailable')
-    }
-  };
-});`
-          },
-          id: 'parse_ai_risk_review',
-          name: 'Parse AI Risk Review',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1120, 220]
-        },
-        {
-          parameters: { mode: 'combine' },
-          id: 'merge_risk_signals',
-          name: 'Merge Risk Signals',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1120, 360]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const routingScore = Number(item.json.routingScore || 0);
-  const aiRiskScore = Number(item.json.aiRiskScore || 0);
-  const escalationScore = aiRiskScore > 0
-    ? Math.round((routingScore * 0.65) + (aiRiskScore * 0.35))
-    : routingScore;
-
-  const escalate = escalationScore >= 70 || item.json.shouldEscalateAi === true;
+  const escalate = escalationScore >= 70;
 
   return {
     json: {
       ...item.json,
       escalationScore,
       escalate,
-      approvalStatus: escalate ? 'escalation_required' : 'standard_approval'
-    }
+      approvalStatus: escalate ? 'escalation_required' : 'standard_approval',
+    },
   };
-});`
-          },
-          id: 'final_routing_decision',
-          name: 'Final Routing Decision',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1340, 360]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.escalationScore}}',
-                  operation: 'largerEqual',
-                  value2: 70
-                }
-              ]
-            }
-          },
-          id: 'escalation_needed',
-          name: 'Escalation Needed?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1560, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-notion.local/api/ops-requests/upsert',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'create_request_record',
-          name: 'Create Request Record',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 420]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/OPS/ESCALATION',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"⚠️ Escalated ops request for {{$json.approver}} | score {{$json.escalationScore}} | reason {{$json.escalationReasonAi}}"}'
-          },
-          id: 'escalate_to_director',
-          name: 'Escalate to Director',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 240]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/OPS/APPROVER',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"New {{$json.requestType || \"ops\"}} request assigned to {{$json.approver}} (SLA {{$json.slaHours}}h)."}'
-          },
-          id: 'notify_assigned_approver',
-          name: 'Notify Assigned Approver',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2000, 420]
-        }
+});`,
+    }),
+    ifNumberNode({ id: 'escalation_check', name: 'Escalation Needed?', valueExpr: '={{$json.escalationScore}}', threshold: 70, position: [1600, 360] }),
+    notionCreatePageNode({
+      id: 'notion_record_request',
+      name: 'Notion Record Request',
+      titleExpr: '={{"Ops Request: " + ($json.requestType || "general") + " | " + ($json.approvalStatus || "standard")}}',
+      position: [1820, 360],
+    }),
+    slackPostNode({
+      id: 'slack_escalation_alert',
+      name: 'Slack Escalation Alert',
+      textExpr: '={{"⚠️ Escalation required for " + ($json.requestType || "request") + " | score " + ($json.escalationScore || 0)}}',
+      position: [1820, 180],
+    }),
+    slackPostNode({
+      id: 'slack_standard_alert',
+      name: 'Slack Standard Alert',
+      textExpr: '={{"New ops request assigned to " + ($json.approver || "ops-manager") + " | SLA " + ($json.slaHours || 24) + "h"}}',
+      position: [1820, 540],
+    }),
+    gmailSendNode({
+      id: 'gmail_request_status',
+      name: 'Gmail Request Status',
+      toExpr: '={{$json.email || "requester@example.com"}}',
+      subject: 'Ops Request Status Update',
+      messageExpr: '={{"Status: " + ($json.approvalStatus || "pending") + "\\nApprover: " + ($json.approver || "ops-manager") + "\\nSLA: " + ($json.slaHours || 24) + "h"}}',
+      position: [2050, 360],
+    }),
+    gmailSendNode({
+      id: 'gmail_owner_escalation',
+      name: 'Gmail Owner Escalation',
+      toExpr: `={{${JSON.stringify(ownerEmailPlaceholder)}}}`,
+      subject: 'Escalated Ops Request',
+      messageExpr: '={{"Escalation score: " + ($json.escalationScore || 0) + "\\nType: " + ($json.requestType || "general")}}',
+      position: [2050, 180],
+    }),
+  ];
+
+  const connections = {
+    'Ops Request Webhook': { main: [[{ node: 'Normalize Ops Request', type: 'main', index: 0 }]] },
+    'Normalize Ops Request': { main: [[{ node: 'Deterministic Ops Routing', type: 'main', index: 0 }]] },
+    'Deterministic Ops Routing': {
+      main: [
+        [{ node: 'AI Ops Risk Agent', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Rules', type: 'main', index: 0 }],
       ],
-      connections: {
-        'Ops Request Webhook': {
-          main: [[{ node: 'Normalize Ops Request', type: 'main', index: 0 }]]
-        },
-        'Normalize Ops Request': {
-          main: [[{ node: 'Policy Routing Engine', type: 'main', index: 0 }]]
-        },
-        'Policy Routing Engine': {
-          main: [
-            [{ node: 'AI Risk Reviewer', type: 'main', index: 0 }],
-            [{ node: 'Merge Risk Signals', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Risk Reviewer': {
-          main: [[{ node: 'Parse AI Risk Review', type: 'main', index: 0 }]]
-        },
-        'Parse AI Risk Review': {
-          main: [[{ node: 'Merge Risk Signals', type: 'main', index: 1 }]]
-        },
-        'Merge Risk Signals': {
-          main: [[{ node: 'Final Routing Decision', type: 'main', index: 0 }]]
-        },
-        'Final Routing Decision': {
-          main: [[{ node: 'Escalation Needed?', type: 'main', index: 0 }]]
-        },
-        'Escalation Needed?': {
-          main: [
-            [
-              { node: 'Escalate to Director', type: 'main', index: 0 },
-              { node: 'Create Request Record', type: 'main', index: 0 }
-            ],
-            [{ node: 'Create Request Record', type: 'main', index: 0 }]
-          ]
-        },
-        'Create Request Record': {
-          main: [[{ node: 'Notify Assigned Approver', type: 'main', index: 0 }]]
-        }
-      }
-    }
-  },
-  {
-    fileName: 'ai-support-ticket-triage-workflow.json',
-    repoDir: 'n8n-ai-support-ticket-triage',
-    workflow: {
-      name: 'AI Support Ticket Triage',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: 'ea44b9b8-71f6-46e2-9804-0d5ef0ba1c93',
-      nodes: [
-        {
-          parameters: {
-            path: 'support-ticket-v2',
-            httpMethod: 'POST',
-            responseMode: 'onReceived'
-          },
-          id: 'ticket_webhook',
-          name: 'Ticket Webhook',
-          type: 'n8n-nodes-base.webhook',
-          typeVersion: 1,
-          position: [220, 320],
-          webhookId: 'support-ticket-v2'
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const message = String(item.json.message || item.json.description || '').trim();
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Ops Risk Agent', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Ops Risk Agent': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Rules', type: 'main', index: 1 }]] },
+    'Merge AI with Rules': { main: [[{ node: 'Final Ops Decision', type: 'main', index: 0 }]] },
+    'Final Ops Decision': { main: [[{ node: 'Escalation Needed?', type: 'main', index: 0 }]] },
+    'Escalation Needed?': {
+      main: [
+        [
+          { node: 'Slack Escalation Alert', type: 'main', index: 0 },
+          { node: 'Notion Record Request', type: 'main', index: 0 },
+          { node: 'Gmail Owner Escalation', type: 'main', index: 0 },
+        ],
+        [
+          { node: 'Slack Standard Alert', type: 'main', index: 0 },
+          { node: 'Notion Record Request', type: 'main', index: 0 },
+        ],
+      ],
+    },
+    'Notion Record Request': { main: [[{ node: 'Gmail Request Status', type: 'main', index: 0 }]] },
+  };
+
+  return {
+    name: 'Internal Ops Routing and Approvals',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: 'df0f02a4-0913-4f2b-a419-bc74f4f4eaa3',
+    nodes,
+    connections,
+  };
+}
+
+function supportWorkflow() {
+  const nodes = [
+    webhookNode({ id: 'ticket_webhook', name: 'Ticket Webhook', path: 'support-ticket-v3', position: [220, 320] }),
+    codeNode({
+      id: 'normalize_ticket',
+      name: 'Normalize Ticket',
+      position: [450, 320],
+      jsCode: `return $input.all().map((item) => {
   const subject = String(item.json.subject || 'No subject');
+  const message = String(item.json.message || item.json.description || 'No message');
   return {
     json: {
       ...item.json,
       subject,
-      message: message || 'No message provided',
-      receivedAt: new Date().toISOString()
-    }
+      message,
+      receivedAt: new Date().toISOString(),
+    },
   };
-});`
-          },
-          id: 'validate_ticket_payload',
-          name: 'Validate Ticket Payload',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [440, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const text = String(item.json.subject || "") + " " + String(item.json.message || "");
-  const loweredText = text.toLowerCase();
-  let ruleSeverityScore = 30;
+});`,
+    }),
+    codeNode({
+      id: 'deterministic_ticket_score',
+      name: 'Deterministic Ticket Score',
+      position: [700, 320],
+      jsCode: `return $input.all().map((item) => {
+  const lowered = (String(item.json.subject || '') + ' ' + String(item.json.message || '')).toLowerCase();
 
-  if (loweredText.includes('outage') || loweredText.includes('down')) ruleSeverityScore += 35;
-  if (loweredText.includes('payment') || loweredText.includes('billing')) ruleSeverityScore += 20;
-  if (loweredText.includes('security') || loweredText.includes('breach')) ruleSeverityScore += 25;
+  let deterministicScore = 30;
+  if (lowered.includes('outage') || lowered.includes('down')) deterministicScore += 35;
+  if (lowered.includes('payment') || lowered.includes('billing')) deterministicScore += 20;
+  if (lowered.includes('security') || lowered.includes('breach')) deterministicScore += 25;
 
   return {
     json: {
       ...item.json,
-      ruleSeverityScore,
-      baselineQueue: ruleSeverityScore >= 70 ? 'urgent-human' : 'ai-assisted'
-    }
+      deterministicScore,
+      baselineQueue: deterministicScore >= 70 ? 'urgent-human' : 'ai-assisted',
+    },
   };
-});`
-          },
-          id: 'deterministic_severity_rules',
-          name: 'Deterministic Severity Rules',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [670, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.1,"messages":[{"role":"system","content":"You triage support tickets. Return JSON: aiSeverityScore (0-100), queue (urgent-human|human|ai-assisted), triageSummary (string)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_triage_agent',
-          name: 'AI Triage Agent',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [900, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
+});`,
+    }),
+    agentNode({
+      id: 'ai_ticket_triage_agent',
+      name: 'AI Ticket Triage Agent',
+      prompt:
+        "={{'You triage support tickets. Return strict JSON with keys aiScore (0-100), priority (urgent-human|human|ai-assisted), summary (string). Ticket payload: ' + JSON.stringify($json)}}",
+      position: [940, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [940, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [1160, 220] }),
+    mergeNode({ id: 'merge_ai_with_rules', name: 'Merge AI with Rules', position: [1160, 360] }),
+    codeNode({
+      id: 'final_ticket_decision',
+      name: 'Final Ticket Decision',
+      position: [1380, 360],
+      jsCode: `return $input.all().map((item) => {
+  const deterministicScore = Number(item.json.deterministicScore || 0);
+  const aiScore = Number(item.json.aiScore || 0);
+  const triageScore = aiScore > 0
+    ? Math.round((deterministicScore * 0.6) + (aiScore * 0.4))
+    : deterministicScore;
 
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
-
-  return {
-    json: {
-      aiSeverityScore: Number(ai.aiSeverityScore ?? 0),
-      aiQueue: String(ai.queue || ''),
-      aiTriageSummary: String(ai.triageSummary || 'ai_response_unavailable')
-    }
-  };
-});`
-          },
-          id: 'parse_ai_triage',
-          name: 'Parse AI Triage',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1120, 220]
-        },
-        {
-          parameters: { mode: 'combine' },
-          id: 'merge_triage_signals',
-          name: 'Merge Triage Signals',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1120, 360]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const rules = Number(item.json.ruleSeverityScore || 0);
-  const ai = Number(item.json.aiSeverityScore || 0);
-  const triageScore = ai > 0 ? Math.round((rules * 0.6) + (ai * 0.4)) : rules;
-  const needsHuman = triageScore >= 70;
+  const queue = triageScore >= 70
+    ? 'urgent-human'
+    : (item.json.aiPriority || item.json.baselineQueue || 'ai-assisted');
 
   return {
     json: {
       ...item.json,
       triageScore,
-      needsHuman,
-      finalQueue: needsHuman ? 'urgent-human' : item.json.aiQueue || item.json.baselineQueue,
-      triageSummary: item.json.aiTriageSummary || 'rules-only triage applied'
-    }
+      queue,
+      summary: item.json.aiSummary || 'deterministic fallback used',
+    },
   };
-});`
-          },
-          id: 'final_triage_decision',
-          name: 'Final Triage Decision',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1340, 360]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.triageScore}}',
-                  operation: 'largerEqual',
-                  value2: 70
-                }
-              ]
-            }
-          },
-          id: 'human_escalation_required',
-          name: 'Human Escalation Required?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1560, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-pagerduty.local/api/incidents',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"title":"Urgent support ticket","ticket":$json.ticketId || $json.id || "unknown","score":$json.triageScore,"summary":$json.triageSummary}'
-          },
-          id: 'escalate_to_human_queue',
-          name: 'Escalate to Human Queue',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 240]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-helpdesk.local/api/tickets/triage',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'update_helpdesk_ticket',
-          name: 'Update Helpdesk Ticket',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 420]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/SUPPORT/SUMMARY',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"Ticket triaged to {{$json.finalQueue}} | score {{$json.triageScore}} | {{$json.triageSummary}}"}'
-          },
-          id: 'post_triage_summary',
-          name: 'Post Triage Summary',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2000, 420]
-        }
-      ],
-      connections: {
-        'Ticket Webhook': {
-          main: [[{ node: 'Validate Ticket Payload', type: 'main', index: 0 }]]
-        },
-        'Validate Ticket Payload': {
-          main: [[{ node: 'Deterministic Severity Rules', type: 'main', index: 0 }]]
-        },
-        'Deterministic Severity Rules': {
-          main: [
-            [{ node: 'AI Triage Agent', type: 'main', index: 0 }],
-            [{ node: 'Merge Triage Signals', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Triage Agent': {
-          main: [[{ node: 'Parse AI Triage', type: 'main', index: 0 }]]
-        },
-        'Parse AI Triage': {
-          main: [[{ node: 'Merge Triage Signals', type: 'main', index: 1 }]]
-        },
-        'Merge Triage Signals': {
-          main: [[{ node: 'Final Triage Decision', type: 'main', index: 0 }]]
-        },
-        'Final Triage Decision': {
-          main: [[{ node: 'Human Escalation Required?', type: 'main', index: 0 }]]
-        },
-        'Human Escalation Required?': {
-          main: [
-            [
-              { node: 'Escalate to Human Queue', type: 'main', index: 0 },
-              { node: 'Update Helpdesk Ticket', type: 'main', index: 0 }
-            ],
-            [{ node: 'Update Helpdesk Ticket', type: 'main', index: 0 }]
-          ]
-        },
-        'Update Helpdesk Ticket': {
-          main: [[{ node: 'Post Triage Summary', type: 'main', index: 0 }]]
-        }
-      }
-    }
-  },
-  {
-    fileName: 'automated-reporting-dashboards-workflow.json',
-    repoDir: 'n8n-automated-reporting-dashboards',
-    workflow: {
-      name: 'Automated Reporting and Dashboards',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: '3fe23b85-b954-4f6f-a462-87ce69961980',
-      nodes: [
-        {
-          parameters: {
-            rule: {
-              interval: [{ field: 'hours', hoursInterval: 24 }]
-            }
-          },
-          id: 'daily_trigger',
-          name: 'Daily Trigger',
-          type: 'n8n-nodes-base.scheduleTrigger',
-          typeVersion: 1,
-          position: [220, 320]
-        },
-        {
-          parameters: {
-            method: 'GET',
-            url: 'https://example-analytics.local/api/metrics'
-          },
-          id: 'pull_product_analytics',
-          name: 'Pull Product Analytics',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [460, 240]
-        },
-        {
-          parameters: {
-            method: 'GET',
-            url: 'https://example-billing.local/api/revenue'
-          },
-          id: 'pull_revenue_metrics',
-          name: 'Pull Revenue Metrics',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [460, 400]
-        },
-        {
-          parameters: {
-            mode: 'combine'
-          },
-          id: 'merge_source_metrics',
-          name: 'Merge Source Metrics',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [700, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const data = item.json;
-  const arr = Array.isArray(data) ? data : [data];
-  const normalized = arr.flatMap((x) => (Array.isArray(x.metrics) ? x.metrics : [x]));
+});`,
+    }),
+    ifNumberNode({ id: 'human_escalation_check', name: 'Human Escalation?', valueExpr: '={{$json.triageScore}}', threshold: 70, position: [1600, 360] }),
+    notionCreatePageNode({
+      id: 'notion_log_ticket',
+      name: 'Notion Log Ticket',
+      titleExpr: '={{"Ticket: " + ($json.subject || "No subject") + " | " + ($json.queue || "ai-assisted")}}',
+      position: [1820, 360],
+    }),
+    slackPostNode({
+      id: 'slack_urgent_ticket',
+      name: 'Slack Urgent Ticket',
+      textExpr: '={{"🚨 Urgent ticket: " + ($json.subject || "No subject") + " | score " + ($json.triageScore || 0)}}',
+      position: [1820, 180],
+    }),
+    slackPostNode({
+      id: 'slack_standard_ticket',
+      name: 'Slack Standard Ticket',
+      textExpr: '={{"Ticket triaged to " + ($json.queue || "ai-assisted") + " | " + ($json.subject || "No subject")}}',
+      position: [1820, 540],
+    }),
+    gmailSendNode({
+      id: 'gmail_ticket_update',
+      name: 'Gmail Ticket Update',
+      toExpr: '={{$json.email || "customer@example.com"}}',
+      subject: 'Support Ticket Update',
+      messageExpr: '={{"Queue: " + ($json.queue || "ai-assisted") + "\\nSummary: " + ($json.summary || "pending")}}',
+      position: [2050, 360],
+    }),
+  ];
 
-  const revenue = Number(item.json.totalRevenue || item.json.revenue || 0);
-  const previousRevenue = Number(item.json.previousRevenue || item.json.lastPeriodRevenue || 0);
+  const connections = {
+    'Ticket Webhook': { main: [[{ node: 'Normalize Ticket', type: 'main', index: 0 }]] },
+    'Normalize Ticket': { main: [[{ node: 'Deterministic Ticket Score', type: 'main', index: 0 }]] },
+    'Deterministic Ticket Score': {
+      main: [
+        [{ node: 'AI Ticket Triage Agent', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Rules', type: 'main', index: 0 }],
+      ],
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Ticket Triage Agent', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Ticket Triage Agent': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Rules', type: 'main', index: 1 }]] },
+    'Merge AI with Rules': { main: [[{ node: 'Final Ticket Decision', type: 'main', index: 0 }]] },
+    'Final Ticket Decision': { main: [[{ node: 'Human Escalation?', type: 'main', index: 0 }]] },
+    'Human Escalation?': {
+      main: [
+        [
+          { node: 'Slack Urgent Ticket', type: 'main', index: 0 },
+          { node: 'Notion Log Ticket', type: 'main', index: 0 },
+        ],
+        [
+          { node: 'Slack Standard Ticket', type: 'main', index: 0 },
+          { node: 'Notion Log Ticket', type: 'main', index: 0 },
+        ],
+      ],
+    },
+    'Notion Log Ticket': { main: [[{ node: 'Gmail Ticket Update', type: 'main', index: 0 }]] },
+  };
+
+  return {
+    name: 'AI Support Ticket Triage',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: '901ed2f2-7d68-4ff0-ab85-e3885f97607c',
+    nodes,
+    connections,
+  };
+}
+
+function reportingWorkflow() {
+  const nodes = [
+    scheduleNode({ id: 'daily_trigger', name: 'Daily Trigger', hoursInterval: 24, position: [220, 320] }),
+    codeNode({
+      id: 'build_kpi_snapshot',
+      name: 'Build KPI Snapshot',
+      position: [470, 320],
+      jsCode: `return $input.all().map(() => {
+  const revenue = Number((Math.random() * 50000 + 50000).toFixed(2));
+  const previousRevenue = Number((Math.random() * 50000 + 45000).toFixed(2));
   const changePct = previousRevenue > 0 ? ((revenue - previousRevenue) / previousRevenue) * 100 : 0;
 
-  const anomalyScore = Math.min(100, Math.max(0, Math.round(Math.abs(changePct) * 2)));
+  return {
+    json: {
+      revenue,
+      previousRevenue,
+      changePct: Number(changePct.toFixed(2)),
+      anomalyScore: Math.min(100, Math.round(Math.abs(changePct) * 3)),
+      generatedAt: new Date().toISOString(),
+    },
+  };
+});`,
+    }),
+    agentNode({
+      id: 'ai_reporting_agent',
+      name: 'AI Reporting Agent',
+      prompt:
+        "={{'You create executive KPI narratives. Return strict JSON with keys aiScore (0-100), priority (normal|watch|critical), summary (string). KPI payload: ' + JSON.stringify($json)}}",
+      position: [730, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [730, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [950, 220] }),
+    mergeNode({ id: 'merge_ai_with_snapshot', name: 'Merge AI with Snapshot', position: [950, 360] }),
+    codeNode({
+      id: 'final_reporting_packet',
+      name: 'Final Reporting Packet',
+      position: [1170, 360],
+      jsCode: `return $input.all().map((item) => {
+  const anomalyScore = Number(item.json.anomalyScore || 0);
+  const aiSummary = item.json.aiSummary || 'deterministic fallback summary';
 
   return {
     json: {
       ...item.json,
-      normalizedMetricCount: normalized.length,
-      kpiSummary: {
-        revenue,
-        previousRevenue,
-        changePct: Number(changePct.toFixed(2))
-      },
-      anomalyScore,
-      reportGeneratedAt: new Date().toISOString()
-    }
+      severity: anomalyScore >= 70 ? 'critical' : anomalyScore >= 45 ? 'watch' : 'normal',
+      executiveSummary: aiSummary,
+    },
   };
-});`
-          },
-          id: 'compute_kpi_pack',
-          name: 'Compute KPI Pack',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [940, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.1,"messages":[{"role":"system","content":"You generate executive KPI summaries. Return JSON: executiveSummary (string), actionItems (array of short strings)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_narrative_generator',
-          name: 'AI Narrative Generator',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1170, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
+});`,
+    }),
+    notionCreatePageNode({
+      id: 'notion_exec_brief',
+      name: 'Notion Exec Brief',
+      titleExpr: '={{"Daily KPI Brief | " + ($json.severity || "normal") + " | " + ($json.generatedAt || "")}}',
+      position: [1390, 300],
+    }),
+    gmailSendNode({
+      id: 'gmail_exec_summary',
+      name: 'Gmail Exec Summary',
+      toExpr: `={{${JSON.stringify(ownerEmailPlaceholder)}}}`,
+      subject: 'Daily KPI Executive Summary',
+      messageExpr: '={{"Revenue: " + ($json.revenue || 0) + "\\nChange: " + ($json.changePct || 0) + "%\\nSummary: " + ($json.executiveSummary || "N/A")}}',
+      position: [1390, 430],
+    }),
+    ifNumberNode({ id: 'anomaly_check', name: 'Anomaly Score High?', valueExpr: '={{$json.anomalyScore}}', threshold: 70, position: [1170, 520] }),
+    slackPostNode({
+      id: 'slack_anomaly_alert',
+      name: 'Slack Anomaly Alert',
+      textExpr: '={{"🚨 KPI anomaly detected | score " + ($json.anomalyScore || 0) + " | change " + ($json.changePct || 0) + "%"}}',
+      position: [1390, 560],
+    }),
+  ];
 
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
+  const connections = {
+    'Daily Trigger': { main: [[{ node: 'Build KPI Snapshot', type: 'main', index: 0 }]] },
+    'Build KPI Snapshot': {
+      main: [
+        [{ node: 'AI Reporting Agent', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Snapshot', type: 'main', index: 0 }],
+      ],
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Reporting Agent', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Reporting Agent': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Snapshot', type: 'main', index: 1 }]] },
+    'Merge AI with Snapshot': { main: [[{ node: 'Final Reporting Packet', type: 'main', index: 0 }]] },
+    'Final Reporting Packet': {
+      main: [
+        [{ node: 'Notion Exec Brief', type: 'main', index: 0 }, { node: 'Gmail Exec Summary', type: 'main', index: 0 }, { node: 'Anomaly Score High?', type: 'main', index: 0 }],
+      ],
+    },
+    'Anomaly Score High?': { main: [[{ node: 'Slack Anomaly Alert', type: 'main', index: 0 }], []] },
+  };
 
   return {
-    json: {
-      executiveSummary: String(ai.executiveSummary || 'Executive summary unavailable; fallback to KPI payload.'),
-      actionItems: Array.isArray(ai.actionItems) ? ai.actionItems : []
-    }
+    name: 'Automated Reporting and Dashboards',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: 'c0f2f95a-7cc4-4569-96aa-42e2f1c2efef',
+    nodes,
+    connections,
   };
-});`
-          },
-          id: 'parse_ai_narrative',
-          name: 'Parse AI Narrative',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1390, 220]
-        },
-        {
-          parameters: { mode: 'combine' },
-          id: 'merge_kpi_narrative',
-          name: 'Merge KPI + Narrative',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1390, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-dashboard.local/api/refresh',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'publish_dashboard_snapshot',
-          name: 'Publish Dashboard Snapshot',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1610, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-mail.local/api/send',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"to":"exec-team@company.com","subject":"Daily KPI Brief","summary":$json.executiveSummary,"actions":$json.actionItems,"kpi":$json.kpiSummary}'
-          },
-          id: 'send_executive_email_brief',
-          name: 'Send Executive Email Brief',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1830, 360]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.anomalyScore}}',
-                  operation: 'largerEqual',
-                  value2: 70
-                }
-              ]
-            }
-          },
-          id: 'anomaly_score_critical',
-          name: 'Anomaly Score Critical?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1610, 520]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/ANALYTICS/ALERTS',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"🚨 KPI anomaly detected (score {{$json.anomalyScore}}). Revenue delta: {{$json.kpiSummary.changePct}}%."}'
-          },
-          id: 'send_anomaly_alert',
-          name: 'Send Anomaly Alert',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1830, 520]
-        }
+}
+
+function onboardingWorkflow() {
+  const nodes = [
+    webhookNode({ id: 'client_intake_webhook', name: 'Client Intake Webhook', path: 'client-intake-v3', position: [220, 320] }),
+    setNode({
+      id: 'normalize_intake',
+      name: 'Normalize Intake',
+      fields: [
+        { name: 'intakeCapturedAt', value: '={{new Date().toISOString()}}' },
+        { name: 'onboardingStatus', value: 'intake_received' },
       ],
-      connections: {
-        'Daily Trigger': {
-          main: [
-            [{ node: 'Pull Product Analytics', type: 'main', index: 0 }],
-            [{ node: 'Pull Revenue Metrics', type: 'main', index: 0 }]
-          ]
-        },
-        'Pull Product Analytics': {
-          main: [[{ node: 'Merge Source Metrics', type: 'main', index: 0 }]]
-        },
-        'Pull Revenue Metrics': {
-          main: [[{ node: 'Merge Source Metrics', type: 'main', index: 1 }]]
-        },
-        'Merge Source Metrics': {
-          main: [[{ node: 'Compute KPI Pack', type: 'main', index: 0 }]]
-        },
-        'Compute KPI Pack': {
-          main: [
-            [{ node: 'AI Narrative Generator', type: 'main', index: 0 }],
-            [{ node: 'Merge KPI + Narrative', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Narrative Generator': {
-          main: [[{ node: 'Parse AI Narrative', type: 'main', index: 0 }]]
-        },
-        'Parse AI Narrative': {
-          main: [[{ node: 'Merge KPI + Narrative', type: 'main', index: 1 }]]
-        },
-        'Merge KPI + Narrative': {
-          main: [
-            [{ node: 'Publish Dashboard Snapshot', type: 'main', index: 0 }],
-            [{ node: 'Anomaly Score Critical?', type: 'main', index: 0 }]
-          ]
-        },
-        'Publish Dashboard Snapshot': {
-          main: [[{ node: 'Send Executive Email Brief', type: 'main', index: 0 }]]
-        },
-        'Anomaly Score Critical?': {
-          main: [[{ node: 'Send Anomaly Alert', type: 'main', index: 0 }], []]
-        }
-      }
-    }
-  },
-  {
-    fileName: 'client-intake-onboarding-workflow.json',
-    repoDir: 'n8n-client-intake-onboarding-automation',
-    workflow: {
-      name: 'Client Intake and Onboarding',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: '1f25ef4c-c307-4116-88fa-2ea8f5f719d3',
-      nodes: [
-        {
-          parameters: {
-            path: 'client-intake-v2',
-            httpMethod: 'POST',
-            responseMode: 'onReceived'
-          },
-          id: 'client_intake_webhook',
-          name: 'Client Intake Webhook',
-          type: 'n8n-nodes-base.webhook',
-          typeVersion: 1,
-          position: [220, 320],
-          webhookId: 'client-intake-v2'
-        },
-        {
-          parameters: {
-            keepOnlySet: false,
-            values: {
-              string: [
-                { name: 'onboardingStatus', value: 'intake_received' },
-                { name: 'intakeCapturedAt', value: '={{new Date().toISOString()}}' }
-              ]
-            }
-          },
-          id: 'normalize_intake',
-          name: 'Normalize Intake',
-          type: 'n8n-nodes-base.set',
-          typeVersion: 3,
-          position: [440, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
+      position: [450, 320],
+    }),
+    codeNode({
+      id: 'deterministic_readiness',
+      name: 'Deterministic Readiness',
+      position: [700, 320],
+      jsCode: `return $input.all().map((item) => {
   const budget = Number(item.json.budget || 0);
   const timeline = String(item.json.timeline || '').toLowerCase();
   const docsProvided = Number(item.json.docsProvided || 0);
 
-  let readinessScore = 40;
-  if (budget >= 5000) readinessScore += 15;
-  if (timeline.includes('asap') || timeline.includes('this week')) readinessScore += 15;
-  if (docsProvided >= 3) readinessScore += 20;
+  let deterministicScore = 40;
+  if (budget >= 5000) deterministicScore += 20;
+  if (timeline.includes('asap') || timeline.includes('this week')) deterministicScore += 20;
+  if (docsProvided >= 3) deterministicScore += 20;
+
+  return {
+    json: {
+      ...item.json,
+      deterministicScore,
+      readinessByRules: deterministicScore >= 80 ? 'kickoff_ready' : 'awaiting_documents',
+    },
+  };
+});`,
+    }),
+    agentNode({
+      id: 'ai_onboarding_agent',
+      name: 'AI Onboarding Agent',
+      prompt:
+        "={{'You plan client onboarding. Return strict JSON with keys aiScore (0-100), priority (kickoff_ready|awaiting_documents), summary (string). Intake payload: ' + JSON.stringify($json)}}",
+      position: [940, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [940, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [1160, 220] }),
+    mergeNode({ id: 'merge_ai_with_rules', name: 'Merge AI with Rules', position: [1160, 360] }),
+    codeNode({
+      id: 'final_onboarding_decision',
+      name: 'Final Onboarding Decision',
+      position: [1380, 360],
+      jsCode: `return $input.all().map((item) => {
+  const deterministicScore = Number(item.json.deterministicScore || 0);
+  const aiScore = Number(item.json.aiScore || 0);
+  const readinessScore = aiScore > 0
+    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))
+    : deterministicScore;
+
+  const onboardingStatus = readinessScore >= 80 ? 'kickoff_ready' : 'awaiting_documents';
 
   return {
     json: {
       ...item.json,
       readinessScore,
-      readinessByRules: readinessScore >= 80 ? 'kickoff-ready' : 'needs-docs'
-    }
+      onboardingStatus,
+      onboardingSummary: item.json.aiSummary || 'deterministic fallback used',
+    },
   };
-});`
-          },
-          id: 'deterministic_readiness_engine',
-          name: 'Deterministic Readiness Engine',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [670, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.15,"messages":[{"role":"system","content":"You create onboarding plans for agency clients. Return JSON: aiReadinessScore (0-100), kickoffRecommendation (ready|not-ready), kickoffChecklist (array), summary (string)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_onboarding_planner',
-          name: 'AI Onboarding Planner',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [900, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
+});`,
+    }),
+    ifNumberNode({ id: 'kickoff_ready_check', name: 'Kickoff Ready?', valueExpr: '={{$json.readinessScore}}', threshold: 80, position: [1600, 360] }),
+    notionCreatePageNode({
+      id: 'notion_onboarding_record',
+      name: 'Notion Onboarding Record',
+      titleExpr: '={{"Onboarding: " + ($json.firstName || $json.name || "Client") + " | " + ($json.onboardingStatus || "pending")}}',
+      position: [1820, 360],
+    }),
+    slackPostNode({
+      id: 'slack_kickoff_ready',
+      name: 'Slack Kickoff Ready',
+      textExpr: '={{"✅ Client kickoff ready: " + ($json.email || "unknown") + " | score " + ($json.readinessScore || 0)}}',
+      position: [1820, 180],
+    }),
+    slackPostNode({
+      id: 'slack_docs_needed',
+      name: 'Slack Docs Needed',
+      textExpr: '={{"📎 Docs needed before kickoff: " + ($json.email || "unknown") + " | score " + ($json.readinessScore || 0)}}',
+      position: [1820, 540],
+    }),
+    gmailSendNode({
+      id: 'gmail_client_update',
+      name: 'Gmail Client Update',
+      toExpr: '={{$json.email || "client@example.com"}}',
+      subject: 'Your Onboarding Status',
+      messageExpr: '={{"Status: " + ($json.onboardingStatus || "pending") + "\\nSummary: " + ($json.onboardingSummary || "N/A")}}',
+      position: [2050, 360],
+    }),
+  ];
 
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
-
-  return {
-    json: {
-      aiReadinessScore: Number(ai.aiReadinessScore ?? 0),
-      kickoffRecommendationAi: String(ai.kickoffRecommendation || 'not-ready'),
-      kickoffChecklistAi: Array.isArray(ai.kickoffChecklist) ? ai.kickoffChecklist : [],
-      onboardingPlanSummary: String(ai.summary || 'ai_plan_unavailable')
-    }
-  };
-});`
-          },
-          id: 'parse_ai_plan',
-          name: 'Parse AI Plan',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1120, 220]
-        },
-        {
-          parameters: { mode: 'combine' },
-          id: 'merge_readiness_signals',
-          name: 'Merge Readiness Signals',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1120, 360]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const rules = Number(item.json.readinessScore || 0);
-  const ai = Number(item.json.aiReadinessScore || 0);
-  const blendedReadiness = ai > 0 ? Math.round((rules * 0.65) + (ai * 0.35)) : rules;
-
-  return {
-    json: {
-      ...item.json,
-      readinessScore: blendedReadiness,
-      onboardingStatus: blendedReadiness >= 80 ? 'kickoff_ready' : 'awaiting_documents',
-      kickoffChecklist: item.json.kickoffChecklistAi || []
-    }
-  };
-});`
-          },
-          id: 'final_onboarding_decision',
-          name: 'Final Onboarding Decision',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1340, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-notion.local/api/onboarding/tasks',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'create_onboarding_tasks',
-          name: 'Create Onboarding Tasks',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1560, 420]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.readinessScore}}',
-                  operation: 'largerEqual',
-                  value2: 80
-                }
-              ]
-            }
-          },
-          id: 'kickoff_ready',
-          name: 'Kickoff Ready?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1560, 240]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-calendly.local/api/schedule',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"email":$json.email,"name":$json.firstName || $json.name,"status":"kickoff_ready","checklist":$json.kickoffChecklist}'
-          },
-          id: 'schedule_kickoff_meeting',
-          name: 'Schedule Kickoff Meeting',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 180]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-mail.local/api/send',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"to":$json.email,"subject":"Missing documents before kickoff","status":$json.onboardingStatus,"summary":$json.onboardingPlanSummary}'
-          },
-          id: 'request_missing_documents',
-          name: 'Request Missing Documents',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 300]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-mail.local/api/send',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"to":$json.email,"subject":"Welcome - onboarding started","status":$json.onboardingStatus,"summary":$json.onboardingPlanSummary}'
-          },
-          id: 'send_welcome_next_steps',
-          name: 'Send Welcome + Next Steps',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1780, 460]
-        }
+  const connections = {
+    'Client Intake Webhook': { main: [[{ node: 'Normalize Intake', type: 'main', index: 0 }]] },
+    'Normalize Intake': { main: [[{ node: 'Deterministic Readiness', type: 'main', index: 0 }]] },
+    'Deterministic Readiness': {
+      main: [
+        [{ node: 'AI Onboarding Agent', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Rules', type: 'main', index: 0 }],
       ],
-      connections: {
-        'Client Intake Webhook': {
-          main: [[{ node: 'Normalize Intake', type: 'main', index: 0 }]]
-        },
-        'Normalize Intake': {
-          main: [[{ node: 'Deterministic Readiness Engine', type: 'main', index: 0 }]]
-        },
-        'Deterministic Readiness Engine': {
-          main: [
-            [{ node: 'AI Onboarding Planner', type: 'main', index: 0 }],
-            [{ node: 'Merge Readiness Signals', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Onboarding Planner': {
-          main: [[{ node: 'Parse AI Plan', type: 'main', index: 0 }]]
-        },
-        'Parse AI Plan': {
-          main: [[{ node: 'Merge Readiness Signals', type: 'main', index: 1 }]]
-        },
-        'Merge Readiness Signals': {
-          main: [[{ node: 'Final Onboarding Decision', type: 'main', index: 0 }]]
-        },
-        'Final Onboarding Decision': {
-          main: [
-            [{ node: 'Create Onboarding Tasks', type: 'main', index: 0 }],
-            [{ node: 'Kickoff Ready?', type: 'main', index: 0 }]
-          ]
-        },
-        'Create Onboarding Tasks': {
-          main: [[{ node: 'Send Welcome + Next Steps', type: 'main', index: 0 }]]
-        },
-        'Kickoff Ready?': {
-          main: [
-            [{ node: 'Schedule Kickoff Meeting', type: 'main', index: 0 }],
-            [{ node: 'Request Missing Documents', type: 'main', index: 0 }]
-          ]
-        }
-      }
-    }
-  },
-  {
-    fileName: 'revenue-ops-crm-sync-workflow.json',
-    repoDir: 'n8n-revenue-ops-crm-sync',
-    workflow: {
-      name: 'Revenue Ops CRM Sync and Enrichment',
-      active: false,
-      settings: { executionOrder: 'v1' },
-      versionId: 'f5002b8a-e495-438c-a953-8e8f36df07ac',
-      nodes: [
-        {
-          parameters: {
-            rule: {
-              interval: [{ field: 'hours', hoursInterval: 6 }]
-            }
-          },
-          id: 'six_hour_trigger',
-          name: '6 Hour Trigger',
-          type: 'n8n-nodes-base.scheduleTrigger',
-          typeVersion: 1,
-          position: [220, 320]
-        },
-        {
-          parameters: {
-            method: 'GET',
-            url: 'https://example-crm.local/api/deals/stale'
-          },
-          id: 'fetch_stale_deals',
-          name: 'Fetch Stale Deals',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [460, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-enrichment.local/api/company',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'enrich_company_profile',
-          name: 'Enrich Company Profile',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [700, 320]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const ageDays = Number(item.json.daysInStage || item.json.stageAgeDays || 0);
-  const amount = Number(item.json.amount || item.json.dealValue || 0);
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Onboarding Agent', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Onboarding Agent': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Rules', type: 'main', index: 1 }]] },
+    'Merge AI with Rules': { main: [[{ node: 'Final Onboarding Decision', type: 'main', index: 0 }]] },
+    'Final Onboarding Decision': { main: [[{ node: 'Kickoff Ready?', type: 'main', index: 0 }]] },
+    'Kickoff Ready?': {
+      main: [
+        [
+          { node: 'Slack Kickoff Ready', type: 'main', index: 0 },
+          { node: 'Notion Onboarding Record', type: 'main', index: 0 },
+        ],
+        [
+          { node: 'Slack Docs Needed', type: 'main', index: 0 },
+          { node: 'Notion Onboarding Record', type: 'main', index: 0 },
+        ],
+      ],
+    },
+    'Notion Onboarding Record': { main: [[{ node: 'Gmail Client Update', type: 'main', index: 0 }]] },
+  };
 
-  let deterministicRisk = 25;
-  if (ageDays > 14) deterministicRisk += 30;
-  if (ageDays > 30) deterministicRisk += 20;
-  if (amount >= 10000) deterministicRisk += 15;
+  return {
+    name: 'Client Intake and Onboarding',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: '25997871-c326-4d87-a8b2-8cb06db579dd',
+    nodes,
+    connections,
+  };
+}
+
+function revenueOpsWorkflow() {
+  const nodes = [
+    scheduleNode({ id: 'six_hour_trigger', name: '6 Hour Trigger', hoursInterval: 6, position: [220, 320] }),
+    hubspotDealSearchNode({ id: 'hubspot_search_deals', name: 'HubSpot Search Deals', position: [470, 320] }),
+    codeNode({
+      id: 'deterministic_deal_risk',
+      name: 'Deterministic Deal Risk',
+      position: [700, 320],
+      jsCode: `return $input.all().map((item) => {
+  const daysInStage = Number(item.json.daysInStage || item.json.stageAgeDays || 18);
+  const amount = Number(item.json.amount || item.json.dealValue || 12000);
+
+  let deterministicScore = 30;
+  if (daysInStage > 14) deterministicScore += 25;
+  if (daysInStage > 30) deterministicScore += 20;
+  if (amount >= 10000) deterministicScore += 15;
 
   return {
     json: {
       ...item.json,
-      deterministicRisk: Math.min(deterministicRisk, 100)
-    }
+      deterministicScore,
+      daysInStage,
+      amount,
+    },
   };
-});`
-          },
-          id: 'deterministic_deal_health_scoring',
-          name: 'Deterministic Deal Health Scoring',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [940, 320]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            sendHeaders: true,
-            headerParameters: {
-              parameters: [
-                {
-                  name: 'Authorization',
-                  value:
-                    "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-                },
-                { name: 'Content-Type', value: 'application/json' }
-              ]
-            },
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"model":"openai/gpt-4o-mini","temperature":0.1,"messages":[{"role":"system","content":"You analyze CRM deals for slippage risk. Return JSON: aiRiskScore (0-100), reason (string), recommendedAction (string)."},{"role":"user","content": JSON.stringify($json)}]}'
-          },
-          id: 'ai_deal_risk_analyst',
-          name: 'AI Deal Risk Analyst',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [1170, 220]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const raw = item.json;
-  let ai = {};
+});`,
+    }),
+    agentNode({
+      id: 'ai_deal_risk_agent',
+      name: 'AI Deal Risk Agent',
+      prompt:
+        "={{'You assess revenue pipeline slippage. Return strict JSON with keys aiScore (0-100), priority (at_risk|healthy), summary (string). Deal payload: ' + JSON.stringify($json)}}",
+      position: [940, 220],
+    }),
+    modelNode({ id: 'openai_chat_model', name: 'OpenAI Chat Model', position: [940, 520] }),
+    codeNode({ id: 'parse_ai_output', name: 'Parse AI Output', jsCode: parseAiOutputCode, position: [1160, 220] }),
+    mergeNode({ id: 'merge_ai_with_rules', name: 'Merge AI with Rules', position: [1160, 360] }),
+    codeNode({
+      id: 'final_deal_decision',
+      name: 'Final Deal Decision',
+      position: [1380, 360],
+      jsCode: `return $input.all().map((item) => {
+  const deterministicScore = Number(item.json.deterministicScore || 0);
+  const aiScore = Number(item.json.aiScore || 0);
+  const dealRiskScore = aiScore > 0
+    ? Math.round((deterministicScore * 0.65) + (aiScore * 0.35))
+    : deterministicScore;
 
-  try {
-    const content = raw.choices?.[0]?.message?.content ?? '';
-    ai = content ? JSON.parse(content) : {};
-  } catch (error) {
-    ai = {};
-  }
-
-  return {
-    json: {
-      aiRiskScore: Number(ai.aiRiskScore ?? 0),
-      aiReason: String(ai.reason || 'ai_response_unavailable'),
-      aiRecommendedAction: String(ai.recommendedAction || 'manual_review')
-    }
-  };
-});`
-          },
-          id: 'parse_ai_deal_risk',
-          name: 'Parse AI Deal Risk',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1390, 220]
-        },
-        {
-          parameters: { mode: 'combine' },
-          id: 'merge_deal_risk_signals',
-          name: 'Merge Deal Risk Signals',
-          type: 'n8n-nodes-base.merge',
-          typeVersion: 3,
-          position: [1390, 360]
-        },
-        {
-          parameters: {
-            jsCode: `return $input.all().map((item) => {
-  const deterministicRisk = Number(item.json.deterministicRisk || 0);
-  const aiRiskScore = Number(item.json.aiRiskScore || 0);
-  const dealRiskScore = aiRiskScore > 0
-    ? Math.round((deterministicRisk * 0.65) + (aiRiskScore * 0.35))
-    : deterministicRisk;
+  const health = dealRiskScore >= 70 ? 'at_risk' : 'healthy';
 
   return {
     json: {
       ...item.json,
       dealRiskScore,
-      health: dealRiskScore >= 70 ? 'at_risk' : 'healthy'
-    }
+      health,
+      riskSummary: item.json.aiSummary || 'deterministic fallback used',
+    },
   };
-});`
-          },
-          id: 'final_deal_risk_decision',
-          name: 'Final Deal Risk Decision',
-          type: 'n8n-nodes-base.code',
-          typeVersion: 2,
-          position: [1610, 360]
-        },
-        {
-          parameters: {
-            conditions: {
-              number: [
-                {
-                  value1: '={{$json.dealRiskScore}}',
-                  operation: 'largerEqual',
-                  value2: 70
-                }
-              ]
-            }
-          },
-          id: 'at_risk_deal',
-          name: 'At Risk Deal?',
-          type: 'n8n-nodes-base.if',
-          typeVersion: 2,
-          position: [1830, 360]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-pm.local/api/tasks',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"title":"Deal rescue playbook","dealId":$json.dealId || $json.id,"risk":$json.dealRiskScore,"reason":$json.aiReason,"action":$json.aiRecommendedAction}'
-          },
-          id: 'create_rescue_task',
-          name: 'Create Rescue Task',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2050, 240]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://example-crm.local/api/deals/upsert-health',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody: '={{$json}}'
-          },
-          id: 'upsert_crm_health_fields',
-          name: 'Upsert CRM Health Fields',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2050, 420]
-        },
-        {
-          parameters: {
-            method: 'POST',
-            url: 'https://hooks.slack.com/services/REPLACE/REVOPS/STATUS',
-            sendBody: true,
-            specifyBody: 'json',
-            jsonBody:
-              '={"text":"Deal {{$json.dealId || $json.id}} marked {{$json.health}} (score {{$json.dealRiskScore}})."}'
-          },
-          id: 'notify_revops_channel',
-          name: 'Notify RevOps Channel',
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          position: [2270, 420]
-        }
+});`,
+    }),
+    hubspotContactUpsertNode({
+      id: 'hubspot_sync_owner_contact',
+      name: 'HubSpot Sync Owner Contact',
+      emailExpr: `={{${JSON.stringify(ownerEmailPlaceholder)}}}`,
+      position: [1600, 480],
+    }),
+    ifNumberNode({ id: 'at_risk_check', name: 'At Risk Deal?', valueExpr: '={{$json.dealRiskScore}}', threshold: 70, position: [1600, 320] }),
+    notionCreatePageNode({
+      id: 'notion_revops_log',
+      name: 'Notion RevOps Log',
+      titleExpr: '={{"RevOps: " + ($json.health || "healthy") + " | score " + ($json.dealRiskScore || 0)}}',
+      position: [1820, 360],
+    }),
+    slackPostNode({
+      id: 'slack_at_risk_alert',
+      name: 'Slack At Risk Alert',
+      textExpr: '={{"🚨 At-risk deal detected | score " + ($json.dealRiskScore || 0) + " | days " + ($json.daysInStage || 0)}}',
+      position: [1820, 180],
+    }),
+    slackPostNode({
+      id: 'slack_healthy_update',
+      name: 'Slack Healthy Update',
+      textExpr: '={{"✅ Deal health normal | score " + ($json.dealRiskScore || 0)}}',
+      position: [1820, 540],
+    }),
+    gmailSendNode({
+      id: 'gmail_revops_summary',
+      name: 'Gmail RevOps Summary',
+      toExpr: `={{${JSON.stringify(ownerEmailPlaceholder)}}}`,
+      subject: 'RevOps Deal Health Summary',
+      messageExpr: '={{"Health: " + ($json.health || "healthy") + "\\nScore: " + ($json.dealRiskScore || 0) + "\\nSummary: " + ($json.riskSummary || "N/A")}}',
+      position: [2050, 360],
+    }),
+  ];
+
+  const connections = {
+    '6 Hour Trigger': { main: [[{ node: 'HubSpot Search Deals', type: 'main', index: 0 }]] },
+    'HubSpot Search Deals': { main: [[{ node: 'Deterministic Deal Risk', type: 'main', index: 0 }]] },
+    'Deterministic Deal Risk': {
+      main: [
+        [{ node: 'AI Deal Risk Agent', type: 'main', index: 0 }],
+        [{ node: 'Merge AI with Rules', type: 'main', index: 0 }],
       ],
-      connections: {
-        '6 Hour Trigger': {
-          main: [[{ node: 'Fetch Stale Deals', type: 'main', index: 0 }]]
-        },
-        'Fetch Stale Deals': {
-          main: [[{ node: 'Enrich Company Profile', type: 'main', index: 0 }]]
-        },
-        'Enrich Company Profile': {
-          main: [[{ node: 'Deterministic Deal Health Scoring', type: 'main', index: 0 }]]
-        },
-        'Deterministic Deal Health Scoring': {
-          main: [
-            [{ node: 'AI Deal Risk Analyst', type: 'main', index: 0 }],
-            [{ node: 'Merge Deal Risk Signals', type: 'main', index: 0 }]
-          ]
-        },
-        'AI Deal Risk Analyst': {
-          main: [[{ node: 'Parse AI Deal Risk', type: 'main', index: 0 }]]
-        },
-        'Parse AI Deal Risk': {
-          main: [[{ node: 'Merge Deal Risk Signals', type: 'main', index: 1 }]]
-        },
-        'Merge Deal Risk Signals': {
-          main: [[{ node: 'Final Deal Risk Decision', type: 'main', index: 0 }]]
-        },
-        'Final Deal Risk Decision': {
-          main: [[{ node: 'At Risk Deal?', type: 'main', index: 0 }]]
-        },
-        'At Risk Deal?': {
-          main: [
-            [
-              { node: 'Create Rescue Task', type: 'main', index: 0 },
-              { node: 'Upsert CRM Health Fields', type: 'main', index: 0 }
-            ],
-            [{ node: 'Upsert CRM Health Fields', type: 'main', index: 0 }]
-          ]
-        },
-        'Upsert CRM Health Fields': {
-          main: [[{ node: 'Notify RevOps Channel', type: 'main', index: 0 }]]
-        }
-      }
-    }
-  }
+    },
+    'OpenAI Chat Model': {
+      ai_languageModel: [[{ node: 'AI Deal Risk Agent', type: 'ai_languageModel', index: 0 }]],
+    },
+    'AI Deal Risk Agent': { main: [[{ node: 'Parse AI Output', type: 'main', index: 0 }]] },
+    'Parse AI Output': { main: [[{ node: 'Merge AI with Rules', type: 'main', index: 1 }]] },
+    'Merge AI with Rules': { main: [[{ node: 'Final Deal Decision', type: 'main', index: 0 }]] },
+    'Final Deal Decision': {
+      main: [
+        [{ node: 'At Risk Deal?', type: 'main', index: 0 }, { node: 'HubSpot Sync Owner Contact', type: 'main', index: 0 }],
+      ],
+    },
+    'At Risk Deal?': {
+      main: [
+        [
+          { node: 'Slack At Risk Alert', type: 'main', index: 0 },
+          { node: 'Notion RevOps Log', type: 'main', index: 0 },
+        ],
+        [
+          { node: 'Slack Healthy Update', type: 'main', index: 0 },
+          { node: 'Notion RevOps Log', type: 'main', index: 0 },
+        ],
+      ],
+    },
+    'Notion RevOps Log': { main: [[{ node: 'Gmail RevOps Summary', type: 'main', index: 0 }]] },
+  };
+
+  return {
+    name: 'Revenue Ops CRM Sync and Enrichment',
+    active: false,
+    settings: { executionOrder: 'v1' },
+    versionId: '03e50be0-bd1f-4444-8912-a426aa3efb76',
+    nodes,
+    connections,
+  };
+}
+
+const workflows = [
+  {
+    fileName: 'lead-intake-qualification-workflow.json',
+    repoDir: 'n8n-lead-intake-qualification-system',
+    workflow: leadWorkflow(),
+  },
+  {
+    fileName: 'internal-ops-routing-approvals-workflow.json',
+    repoDir: 'n8n-internal-ops-routing-approvals',
+    workflow: internalOpsWorkflow(),
+  },
+  {
+    fileName: 'ai-support-ticket-triage-workflow.json',
+    repoDir: 'n8n-ai-support-ticket-triage',
+    workflow: supportWorkflow(),
+  },
+  {
+    fileName: 'automated-reporting-dashboards-workflow.json',
+    repoDir: 'n8n-automated-reporting-dashboards',
+    workflow: reportingWorkflow(),
+  },
+  {
+    fileName: 'client-intake-onboarding-workflow.json',
+    repoDir: 'n8n-client-intake-onboarding-automation',
+    workflow: onboardingWorkflow(),
+  },
+  {
+    fileName: 'revenue-ops-crm-sync-workflow.json',
+    repoDir: 'n8n-revenue-ops-crm-sync',
+    workflow: revenueOpsWorkflow(),
+  },
 ];
 
 for (const item of workflows) {
@@ -1591,4 +1138,4 @@ for (const item of workflows) {
   writeFileSync(repoPath, workflowJson, 'utf8');
 }
 
-console.log(`Generated ${workflows.length} workflows in public and repo mirrors.`);
+console.log(`Generated ${workflows.length} native-node workflows in public and repo mirrors.`);

@@ -4,11 +4,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "ea44b9b8-71f6-46e2-9804-0d5ef0ba1c93",
+  "versionId": "901ed2f2-7d68-4ff0-ab85-e3885f97607c",
   "nodes": [
     {
       "parameters": {
-        "path": "support-ticket-v2",
+        "path": "support-ticket-v3",
         "httpMethod": "POST",
         "responseMode": "onReceived"
       },
@@ -20,74 +20,76 @@
         220,
         320
       ],
-      "webhookId": "support-ticket-v2"
+      "webhookId": "support-ticket-v3"
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const message = String(item.json.message || item.json.description || '').trim();\n  const subject = String(item.json.subject || 'No subject');\n  return {\n    json: {\n      ...item.json,\n      subject,\n      message: message || 'No message provided',\n      receivedAt: new Date().toISOString()\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const subject = String(item.json.subject || 'No subject');\n  const message = String(item.json.message || item.json.description || 'No message');\n  return {\n    json: {\n      ...item.json,\n      subject,\n      message,\n      receivedAt: new Date().toISOString(),\n    },\n  };\n});"
       },
-      "id": "validate_ticket_payload",
-      "name": "Validate Ticket Payload",
+      "id": "normalize_ticket",
+      "name": "Normalize Ticket",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
+        450,
         320
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const text = String(item.json.subject || \"\") + \" \" + String(item.json.message || \"\");\n  const loweredText = text.toLowerCase();\n  let ruleSeverityScore = 30;\n\n  if (loweredText.includes('outage') || loweredText.includes('down')) ruleSeverityScore += 35;\n  if (loweredText.includes('payment') || loweredText.includes('billing')) ruleSeverityScore += 20;\n  if (loweredText.includes('security') || loweredText.includes('breach')) ruleSeverityScore += 25;\n\n  return {\n    json: {\n      ...item.json,\n      ruleSeverityScore,\n      baselineQueue: ruleSeverityScore >= 70 ? 'urgent-human' : 'ai-assisted'\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const lowered = (String(item.json.subject || '') + ' ' + String(item.json.message || '')).toLowerCase();\n\n  let deterministicScore = 30;\n  if (lowered.includes('outage') || lowered.includes('down')) deterministicScore += 35;\n  if (lowered.includes('payment') || lowered.includes('billing')) deterministicScore += 20;\n  if (lowered.includes('security') || lowered.includes('breach')) deterministicScore += 25;\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore,\n      baselineQueue: deterministicScore >= 70 ? 'urgent-human' : 'ai-assisted',\n    },\n  };\n});"
       },
-      "id": "deterministic_severity_rules",
-      "name": "Deterministic Severity Rules",
+      "id": "deterministic_ticket_score",
+      "name": "Deterministic Ticket Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        670,
+        700,
         320
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://openrouter.ai/api/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You triage support tickets. Return JSON: aiSeverityScore (0-100), queue (urgent-human|human|ai-assisted), triageSummary (string).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+        "promptType": "define",
+        "text": "={{'You triage support tickets. Return strict JSON with keys aiScore (0-100), priority (urgent-human|human|ai-assisted), summary (string). Ticket payload: ' + JSON.stringify($json)}}",
+        "options": {}
       },
-      "id": "ai_triage_agent",
-      "name": "AI Triage Agent",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "ai_ticket_triage_agent",
+      "name": "AI Ticket Triage Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
       "position": [
-        900,
+        940,
         220
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiSeverityScore: Number(ai.aiSeverityScore ?? 0),\n      aiQueue: String(ai.queue || ''),\n      aiTriageSummary: String(ai.triageSummary || 'ai_response_unavailable')\n    }\n  };\n});"
+        "model": {
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
       },
-      "id": "parse_ai_triage",
-      "name": "Parse AI Triage",
+      "id": "openai_chat_model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+      },
+      "id": "parse_ai_output",
+      "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
+        1160,
         220
       ]
     },
@@ -95,25 +97,25 @@
       "parameters": {
         "mode": "combine"
       },
-      "id": "merge_triage_signals",
-      "name": "Merge Triage Signals",
+      "id": "merge_ai_with_rules",
+      "name": "Merge AI with Rules",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1120,
+        1160,
         360
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const rules = Number(item.json.ruleSeverityScore || 0);\n  const ai = Number(item.json.aiSeverityScore || 0);\n  const triageScore = ai > 0 ? Math.round((rules * 0.6) + (ai * 0.4)) : rules;\n  const needsHuman = triageScore >= 70;\n\n  return {\n    json: {\n      ...item.json,\n      triageScore,\n      needsHuman,\n      finalQueue: needsHuman ? 'urgent-human' : item.json.aiQueue || item.json.baselineQueue,\n      triageSummary: item.json.aiTriageSummary || 'rules-only triage applied'\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const triageScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.6) + (aiScore * 0.4))\n    : deterministicScore;\n\n  const queue = triageScore >= 70\n    ? 'urgent-human'\n    : (item.json.aiPriority || item.json.baselineQueue || 'ai-assisted');\n\n  return {\n    json: {\n      ...item.json,\n      triageScore,\n      queue,\n      summary: item.json.aiSummary || 'deterministic fallback used',\n    },\n  };\n});"
       },
-      "id": "final_triage_decision",
-      "name": "Final Triage Decision",
+      "id": "final_ticket_decision",
+      "name": "Final Ticket Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1340,
+        1380,
         360
       ]
     },
@@ -129,64 +131,92 @@
           ]
         }
       },
-      "id": "human_escalation_required",
-      "name": "Human Escalation Required?",
+      "id": "human_escalation_check",
+      "name": "Human Escalation?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1560,
+        1600,
         360
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://example-pagerduty.local/api/incidents",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"title\":\"Urgent support ticket\",\"ticket\":$json.ticketId || $json.id || \"unknown\",\"score\":$json.triageScore,\"summary\":$json.triageSummary}"
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "https://www.notion.so/00000000000000000000000000000000"
+        },
+        "title": "={{\"Ticket: \" + ($json.subject || \"No subject\") + \" | \" + ($json.queue || \"ai-assisted\")}}",
+        "simple": true
       },
-      "id": "escalate_to_human_queue",
-      "name": "Escalate to Human Queue",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "notion_log_ticket",
+      "name": "Notion Log Ticket",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
-        1780,
-        240
+        1820,
+        360
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://example-helpdesk.local/api/tickets/triage",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{$json}}"
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"🚨 Urgent ticket: \" + ($json.subject || \"No subject\") + \" | score \" + ($json.triageScore || 0)}}"
       },
-      "id": "update_helpdesk_ticket",
-      "name": "Update Helpdesk Ticket",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "slack_urgent_ticket",
+      "name": "Slack Urgent Ticket",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        1780,
-        420
+        1820,
+        180
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/REPLACE/SUPPORT/SUMMARY",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\":\"Ticket triaged to {{$json.finalQueue}} | score {{$json.triageScore}} | {{$json.triageSummary}}\"}"
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"Ticket triaged to \" + ($json.queue || \"ai-assisted\") + \" | \" + ($json.subject || \"No subject\")}}"
       },
-      "id": "post_triage_summary",
-      "name": "Post Triage Summary",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "slack_standard_ticket",
+      "name": "Slack Standard Ticket",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        2000,
-        420
+        1820,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$json.email || \"customer@example.com\"}}",
+        "subject": "Support Ticket Update",
+        "message": "={{\"Queue: \" + ($json.queue || \"ai-assisted\") + \"\\nSummary: \" + ($json.summary || \"pending\")}}"
+      },
+      "id": "gmail_ticket_update",
+      "name": "Gmail Ticket Update",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2050,
+        360
       ]
     }
   ],
@@ -195,114 +225,130 @@
       "main": [
         [
           {
-            "node": "Validate Ticket Payload",
+            "node": "Normalize Ticket",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Ticket Payload": {
+    "Normalize Ticket": {
       "main": [
         [
           {
-            "node": "Deterministic Severity Rules",
+            "node": "Deterministic Ticket Score",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Deterministic Severity Rules": {
+    "Deterministic Ticket Score": {
       "main": [
         [
           {
-            "node": "AI Triage Agent",
+            "node": "AI Ticket Triage Agent",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Merge Triage Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Triage Agent": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Ticket Triage Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Ticket Triage Agent": {
       "main": [
         [
           {
-            "node": "Parse AI Triage",
+            "node": "Parse AI Output",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse AI Triage": {
+    "Parse AI Output": {
       "main": [
         [
           {
-            "node": "Merge Triage Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 1
           }
         ]
       ]
     },
-    "Merge Triage Signals": {
+    "Merge AI with Rules": {
       "main": [
         [
           {
-            "node": "Final Triage Decision",
+            "node": "Final Ticket Decision",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Final Triage Decision": {
+    "Final Ticket Decision": {
       "main": [
         [
           {
-            "node": "Human Escalation Required?",
+            "node": "Human Escalation?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Human Escalation Required?": {
+    "Human Escalation?": {
       "main": [
         [
           {
-            "node": "Escalate to Human Queue",
+            "node": "Slack Urgent Ticket",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Update Helpdesk Ticket",
+            "node": "Notion Log Ticket",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Update Helpdesk Ticket",
+            "node": "Slack Standard Ticket",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion Log Ticket",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Update Helpdesk Ticket": {
+    "Notion Log Ticket": {
       "main": [
         [
           {
-            "node": "Post Triage Summary",
+            "node": "Gmail Ticket Update",
             "type": "main",
             "index": 0
           }

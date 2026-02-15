@@ -12,9 +12,9 @@ const repos = [
       'AI-assisted inbound lead scoring with deterministic fallback, hot-lead alerts, CRM upserts, and owner notifications.',
     architecture: [
       'Webhook intake -> payload normalization -> deterministic score',
-      'AI qualification via OpenRouter -> parsed score signal',
+      'AI Agent + OpenAI Chat Model -> parsed AI signal',
       'Signal merge -> final weighted score and priority decision',
-      'Hot-lead branch to sales alert + all-leads CRM upsert + owner notification'
+      'Hot-lead branch to Slack + HubSpot + Notion + Gmail owner summary'
     ]
   },
   {
@@ -25,9 +25,9 @@ const repos = [
       'Policy-first request routing with AI escalation risk review, SLA-aware approvals, and escalation notifications.',
     architecture: [
       'Webhook intake -> normalization -> deterministic routing policy engine',
-      'AI risk review for escalation signal generation',
+      'AI Agent + OpenAI Chat Model for escalation signal generation',
       'Merged risk decision -> escalation branch or standard approval flow',
-      'Persistent request record + approver notification'
+      'Persistent request record in Notion + Slack + Gmail notifications'
     ]
   },
   {
@@ -38,9 +38,9 @@ const repos = [
       'Ticket triage pipeline combining deterministic severity heuristics with AI queueing decisions and human escalation paths.',
     architecture: [
       'Webhook intake -> payload validation -> deterministic severity score',
-      'AI triage scoring and queue recommendation via OpenRouter',
+      'AI Agent + OpenAI Chat Model triage scoring and queue recommendation',
       'Signal merge -> final triage decision and escalation score',
-      'Urgent branch to human escalation + universal helpdesk update + summary post'
+      'Urgent branch to Slack escalation + Notion log + Gmail customer update'
     ]
   },
   {
@@ -50,10 +50,10 @@ const repos = [
     description:
       'Scheduled KPI pipeline with multi-source merge, anomaly scoring, AI narrative generation, and executive distribution.',
     architecture: [
-      'Daily trigger -> pull analytics and revenue sources',
-      'Source merge -> KPI computation + anomaly scoring',
-      'AI executive narrative generation and parse',
-      'Dashboard refresh + executive brief + anomaly alert branch'
+      'Daily trigger -> deterministic KPI snapshot + anomaly scoring',
+      'AI Agent + OpenAI Chat Model executive narrative generation',
+      'Signal merge -> final reporting packet',
+      'Notion brief + Gmail exec summary + Slack anomaly branch'
     ]
   },
   {
@@ -64,9 +64,9 @@ const repos = [
       'Client onboarding flow with readiness scoring, AI onboarding planning, kickoff/no-kickoff branching, and client comms.',
     architecture: [
       'Webhook intake -> normalization -> deterministic readiness engine',
-      'AI onboarding planner signal via OpenRouter',
+      'AI Agent + OpenAI Chat Model onboarding signal',
       'Merged readiness decision for kickoff readiness',
-      'Task creation + kickoff scheduling or missing-document request + welcome summary'
+      'Notion onboarding record + Slack branch + Gmail client update'
     ]
   },
   {
@@ -76,10 +76,10 @@ const repos = [
     description:
       'Scheduled stale-deal sync with enrichment, AI slippage-risk analysis, rescue-task branching, and RevOps alerts.',
     architecture: [
-      '6-hour trigger -> stale-deal fetch -> enrichment',
-      'Deterministic deal health scoring + AI risk analysis',
+      '6-hour trigger -> HubSpot deal search -> deterministic risk scoring',
+      'AI Agent + OpenAI Chat Model risk analysis',
       'Signal merge -> final risk decision',
-      'At-risk branch to rescue tasks + CRM health upsert + RevOps channel notifications'
+      'HubSpot sync + Notion log + Slack branch + Gmail RevOps summary'
     ]
   }
 ];
@@ -90,21 +90,26 @@ for (const repo of repos) {
 ${repo.description}
 
 ## Files
-- \`n8n/workflow.json\` importable n8n workflow (AI-assisted + deterministic fallback)
+- \`n8n/workflow.json\` importable n8n workflow (AI Agent + deterministic fallback + native app nodes)
 
 ## Architecture
 ${repo.architecture.map((step) => `- ${step}`).join('\n')}
 
 ## Runtime Requirements
 - n8n (validated with containerized import on n8n latest)
-- Set \`OPENROUTER_API_KEY\` in your n8n environment for AI nodes
-- Replace placeholder webhook/API endpoints and credentials before activation
+- Configure credentials for:
+  - \`OpenAI\` (for \`AI Agent\` model connection)
+  - \`Slack\`
+  - \`Notion\`
+  - \`Gmail\`
+  - \`HubSpot\` (where used)
+- Replace placeholder channel/database IDs and recipient addresses before activation
 
 ## Import
 1. Open n8n UI.
 2. Go to \`Workflows -> Import from File\`.
 3. Select \`n8n/workflow.json\`.
-4. Configure credentials and endpoint placeholders.
+4. Configure credentials and placeholder IDs.
 5. Run a manual execution test before enabling schedule/webhook traffic.
 
 ## Live Demo

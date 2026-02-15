@@ -4,11 +4,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "66e7fbf8-f3df-4456-8d20-7d17956ef31f",
+  "versionId": "df0f02a4-0913-4f2b-a419-bc74f4f4eaa3",
   "nodes": [
     {
       "parameters": {
-        "path": "ops-request-v2",
+        "path": "ops-request-v3",
         "httpMethod": "POST",
         "responseMode": "onReceived"
       },
@@ -20,7 +20,7 @@
         220,
         320
       ],
-      "webhookId": "ops-request-v2"
+      "webhookId": "ops-request-v3"
     },
     {
       "parameters": {
@@ -28,12 +28,12 @@
         "values": {
           "string": [
             {
-              "name": "status",
-              "value": "intake_received"
-            },
-            {
               "name": "requestReceivedAt",
               "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "status",
+              "value": "intake_received"
             }
           ]
         }
@@ -43,63 +43,65 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
       "position": [
-        440,
+        450,
         320
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const requestType = String(item.json.requestType || 'general').toLowerCase();\n  const priority = String(item.json.priority || 'normal').toLowerCase();\n  const impact = String(item.json.impact || 'medium').toLowerCase();\n\n  const approver = requestType.includes('finance')\n    ? 'finance-manager'\n    : requestType.includes('security')\n    ? 'security-lead'\n    : 'ops-manager';\n\n  let routingScore = 35;\n  if (priority.includes('high') || priority.includes('urgent')) routingScore += 25;\n  if (impact.includes('high') || impact.includes('critical')) routingScore += 20;\n  if (requestType.includes('access') || requestType.includes('security')) routingScore += 10;\n\n  return {\n    json: {\n      ...item.json,\n      approver,\n      slaHours: routingScore >= 75 ? 4 : routingScore >= 55 ? 12 : 24,\n      routingScore\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const requestType = String(item.json.requestType || 'general').toLowerCase();\n  const priority = String(item.json.priority || 'normal').toLowerCase();\n\n  let deterministicScore = 40;\n  if (priority.includes('high') || priority.includes('urgent')) deterministicScore += 25;\n  if (requestType.includes('finance')) deterministicScore += 15;\n  if (requestType.includes('security')) deterministicScore += 20;\n\n  const approver = requestType.includes('finance')\n    ? 'finance-manager'\n    : requestType.includes('security')\n    ? 'security-lead'\n    : 'ops-manager';\n\n  return {\n    json: {\n      ...item.json,\n      deterministicScore,\n      approver,\n      slaHours: deterministicScore >= 75 ? 4 : deterministicScore >= 55 ? 12 : 24,\n    },\n  };\n});"
       },
-      "id": "policy_routing_engine",
-      "name": "Policy Routing Engine",
+      "id": "deterministic_ops_routing",
+      "name": "Deterministic Ops Routing",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        670,
+        700,
         320
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://openrouter.ai/api/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{$env.OPENROUTER_API_KEY ? 'Bearer ' + $env.OPENROUTER_API_KEY : 'Bearer REPLACE_OPENROUTER_API_KEY'}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"openai/gpt-4o-mini\",\"temperature\":0.1,\"messages\":[{\"role\":\"system\",\"content\":\"You review internal ops requests for escalation risk. Return JSON: riskScore (0-100), escalationReason (string), shouldEscalate (true|false).\"},{\"role\":\"user\",\"content\": JSON.stringify($json)}]}"
+        "promptType": "define",
+        "text": "={{'You classify internal ops requests for escalation risk. Return strict JSON with keys aiScore (0-100), priority (escalate|standard), summary (string). Request payload: ' + JSON.stringify($json)}}",
+        "options": {}
       },
-      "id": "ai_risk_reviewer",
-      "name": "AI Risk Reviewer",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "ai_ops_risk_agent",
+      "name": "AI Ops Risk Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
       "position": [
-        900,
+        940,
         220
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const raw = item.json;\n  let ai = {};\n\n  try {\n    const content = raw.choices?.[0]?.message?.content ?? '';\n    ai = content ? JSON.parse(content) : {};\n  } catch (error) {\n    ai = {};\n  }\n\n  return {\n    json: {\n      aiRiskScore: Number(ai.riskScore ?? 0),\n      shouldEscalateAi: ai.shouldEscalate === true,\n      escalationReasonAi: String(ai.escalationReason || 'ai_response_unavailable')\n    }\n  };\n});"
+        "model": {
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
       },
-      "id": "parse_ai_risk_review",
-      "name": "Parse AI Risk Review",
+      "id": "openai_chat_model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const rawCandidate =\n    item.json.output ??\n    item.json.text ??\n    item.json.response ??\n    item.json.result ??\n    item.json;\n\n  let parsed = {};\n\n  if (typeof rawCandidate === 'string') {\n    try {\n      parsed = JSON.parse(rawCandidate);\n    } catch (error) {\n      parsed = { summary: rawCandidate };\n    }\n  } else if (rawCandidate && typeof rawCandidate === 'object') {\n    parsed = rawCandidate;\n  }\n\n  const pickNumber = (...keys) => {\n    for (const key of keys) {\n      const value = Number(parsed[key]);\n      if (Number.isFinite(value) && value > 0) return value;\n    }\n    return 0;\n  };\n\n  const pickString = (...keys) => {\n    for (const key of keys) {\n      const value = parsed[key];\n      if (typeof value === 'string' && value.trim()) return value.trim();\n    }\n    return '';\n  };\n\n  return {\n    json: {\n      aiScore: pickNumber('aiScore', 'score', 'riskScore', 'severityScore', 'readinessScore'),\n      aiPriority: pickString('priority', 'queue', 'recommendation', 'decision'),\n      aiSummary: pickString('summary', 'rationale', 'reason', 'triageSummary', 'recommendation') || 'ai_response_unavailable',\n      aiPayload: parsed,\n    },\n  };\n});"
+      },
+      "id": "parse_ai_output",
+      "name": "Parse AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
+        1160,
         220
       ]
     },
@@ -107,25 +109,25 @@
       "parameters": {
         "mode": "combine"
       },
-      "id": "merge_risk_signals",
-      "name": "Merge Risk Signals",
+      "id": "merge_ai_with_rules",
+      "name": "Merge AI with Rules",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1120,
+        1160,
         360
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const routingScore = Number(item.json.routingScore || 0);\n  const aiRiskScore = Number(item.json.aiRiskScore || 0);\n  const escalationScore = aiRiskScore > 0\n    ? Math.round((routingScore * 0.65) + (aiRiskScore * 0.35))\n    : routingScore;\n\n  const escalate = escalationScore >= 70 || item.json.shouldEscalateAi === true;\n\n  return {\n    json: {\n      ...item.json,\n      escalationScore,\n      escalate,\n      approvalStatus: escalate ? 'escalation_required' : 'standard_approval'\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const deterministicScore = Number(item.json.deterministicScore || 0);\n  const aiScore = Number(item.json.aiScore || 0);\n  const escalationScore = aiScore > 0\n    ? Math.round((deterministicScore * 0.7) + (aiScore * 0.3))\n    : deterministicScore;\n\n  const escalate = escalationScore >= 70;\n\n  return {\n    json: {\n      ...item.json,\n      escalationScore,\n      escalate,\n      approvalStatus: escalate ? 'escalation_required' : 'standard_approval',\n    },\n  };\n});"
       },
-      "id": "final_routing_decision",
-      "name": "Final Routing Decision",
+      "id": "final_ops_decision",
+      "name": "Final Ops Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1340,
+        1380,
         360
       ]
     },
@@ -141,64 +143,109 @@
           ]
         }
       },
-      "id": "escalation_needed",
+      "id": "escalation_check",
       "name": "Escalation Needed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1560,
+        1600,
         360
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://example-notion.local/api/ops-requests/upsert",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{$json}}"
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "mode": "url",
+          "value": "https://www.notion.so/00000000000000000000000000000000"
+        },
+        "title": "={{\"Ops Request: \" + ($json.requestType || \"general\") + \" | \" + ($json.approvalStatus || \"standard\")}}",
+        "simple": true
       },
-      "id": "create_request_record",
-      "name": "Create Request Record",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "notion_record_request",
+      "name": "Notion Record Request",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
-        1780,
-        420
+        1820,
+        360
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/REPLACE/OPS/ESCALATION",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\":\"⚠️ Escalated ops request for {{$json.approver}} | score {{$json.escalationScore}} | reason {{$json.escalationReasonAi}}\"}"
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"⚠️ Escalation required for \" + ($json.requestType || \"request\") + \" | score \" + ($json.escalationScore || 0)}}"
       },
-      "id": "escalate_to_director",
-      "name": "Escalate to Director",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "slack_escalation_alert",
+      "name": "Slack Escalation Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        1780,
-        240
+        1820,
+        180
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/REPLACE/OPS/APPROVER",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\":\"New {{$json.requestType || \"ops\"}} request assigned to {{$json.approver}} (SLA {{$json.slaHours}}h).\"}"
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "C01234567"
+        },
+        "messageType": "text",
+        "text": "={{\"New ops request assigned to \" + ($json.approver || \"ops-manager\") + \" | SLA \" + ($json.slaHours || 24) + \"h\"}}"
       },
-      "id": "notify_assigned_approver",
-      "name": "Notify Assigned Approver",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "slack_standard_alert",
+      "name": "Slack Standard Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        2000,
-        420
+        1820,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$json.email || \"requester@example.com\"}}",
+        "subject": "Ops Request Status Update",
+        "message": "={{\"Status: \" + ($json.approvalStatus || \"pending\") + \"\\nApprover: \" + ($json.approver || \"ops-manager\") + \"\\nSLA: \" + ($json.slaHours || 24) + \"h\"}}"
+      },
+      "id": "gmail_request_status",
+      "name": "Gmail Request Status",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2050,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{\"owner@example.com\"}}",
+        "subject": "Escalated Ops Request",
+        "message": "={{\"Escalation score: \" + ($json.escalationScore || 0) + \"\\nType: \" + ($json.requestType || \"general\")}}"
+      },
+      "id": "gmail_owner_escalation",
+      "name": "Gmail Owner Escalation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2050,
+        180
       ]
     }
   ],
@@ -218,65 +265,76 @@
       "main": [
         [
           {
-            "node": "Policy Routing Engine",
+            "node": "Deterministic Ops Routing",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Policy Routing Engine": {
+    "Deterministic Ops Routing": {
       "main": [
         [
           {
-            "node": "AI Risk Reviewer",
+            "node": "AI Ops Risk Agent",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Merge Risk Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Risk Reviewer": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Ops Risk Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Ops Risk Agent": {
       "main": [
         [
           {
-            "node": "Parse AI Risk Review",
+            "node": "Parse AI Output",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse AI Risk Review": {
+    "Parse AI Output": {
       "main": [
         [
           {
-            "node": "Merge Risk Signals",
+            "node": "Merge AI with Rules",
             "type": "main",
             "index": 1
           }
         ]
       ]
     },
-    "Merge Risk Signals": {
+    "Merge AI with Rules": {
       "main": [
         [
           {
-            "node": "Final Routing Decision",
+            "node": "Final Ops Decision",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Final Routing Decision": {
+    "Final Ops Decision": {
       "main": [
         [
           {
@@ -291,30 +349,40 @@
       "main": [
         [
           {
-            "node": "Escalate to Director",
+            "node": "Slack Escalation Alert",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Create Request Record",
+            "node": "Notion Record Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Owner Escalation",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Create Request Record",
+            "node": "Slack Standard Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion Record Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create Request Record": {
+    "Notion Record Request": {
       "main": [
         [
           {
-            "node": "Notify Assigned Approver",
+            "node": "Gmail Request Status",
             "type": "main",
             "index": 0
           }
