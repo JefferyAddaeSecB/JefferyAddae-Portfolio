@@ -709,6 +709,16 @@ exports.onLeadSubmit = functions
       );
     }
 
+    // Send automated reply to client
+    await sendAutoReplyToClient(
+      lead,
+      emailUser.value(),
+      emailPassword.value(),
+      openrouterKey.value(),
+      priority,
+      score
+    );
+
     console.log(`Lead scored: ${lead.name} - ${priority} (${score}/100)`);
 
     return null;
@@ -749,4 +759,182 @@ Reply to this email to contact them directly.`
   } catch (error) {
     console.error('Error sending hot lead alert:', error);
   }
+}
+
+// Send automated reply to client
+async function sendAutoReplyToClient(lead, userEmail, userPassword, apiKey, priority, score) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: userEmail, pass: userPassword }
+  });
+
+  try {
+    // Generate personalized response based on message content
+    const replyContent = await generateAutoReply(lead, apiKey, priority, score);
+
+    // Determine subject based on priority
+    const subject = priority === 'Hot'
+      ? `Thanks ${lead.firstName || lead.name.split(' ')[0]}! Let's talk soon 🚀`
+      : `Thanks for reaching out, ${lead.firstName || lead.name.split(' ')[0]}!`;
+
+    await transporter.sendMail({
+      from: `Jeffery Addae <${userEmail}>`,
+      to: lead.email,
+      subject: subject,
+      html: replyContent,
+      text: replyContent.replace(/<[^>]*>/g, '') // Strip HTML for text version
+    });
+
+    console.log(`✅ Auto-reply sent to ${lead.email}`);
+  } catch (error) {
+    console.error('Error sending auto-reply:', error);
+  }
+}
+
+// Generate personalized auto-reply with AI
+async function generateAutoReply(lead, apiKey, priority, score) {
+  const firstName = lead.firstName || lead.name.split(' ')[0];
+  const message = lead.details || lead.message || '';
+  const goal = lead.goal || '';
+  const timeline = lead.timeline || '';
+
+  // Determine message type
+  let messageType = 'general';
+  const messageLower = (message + ' ' + goal).toLowerCase();
+
+  if (messageLower.includes('automation') || messageLower.includes('ai') || messageLower.includes('chatbot')) {
+    messageType = 'automation';
+  } else if (messageLower.includes('website') || messageLower.includes('web dev') || messageLower.includes('fullstack')) {
+    messageType = 'website';
+  } else if (messageLower.includes('hire') || messageLower.includes('job') || messageLower.includes('work')) {
+    messageType = 'hiring';
+  } else if (messageLower.includes('collaborate') || messageLower.includes('partnership')) {
+    messageType = 'collaboration';
+  }
+
+  // Use AI to generate personalized response if API key available
+  if (apiKey) {
+    try {
+      const prompt = `You are Jeffery Addae, a fullstack developer and automation specialist. Write a warm, professional auto-reply email to ${firstName} who just contacted you.
+
+Their message: "${message}"
+Message type: ${messageType}
+Priority: ${priority}
+Lead score: ${score}/100
+${timeline ? `Timeline: ${timeline}` : ''}
+${goal ? `Goal: ${goal}` : ''}
+
+Instructions:
+- Thank them for reaching out
+- Acknowledge what they're interested in (${messageType === 'automation' ? 'automation/AI services' : messageType === 'website' ? 'web development' : messageType === 'hiring' ? 'potential opportunity' : 'connecting'})
+- ${priority === 'Hot' ? 'Express excitement and mention you\'ll reach out within 24 hours' : 'Mention you\'ll get back to them soon'}
+- Keep it warm, professional, and conversational (not salesy)
+- Include a subtle CTA to book a call: https://www.jefferyaddae.it.com/contact
+- Sign off with "Best, Jeffery"
+- Keep it under 150 words
+- Use HTML formatting (paragraphs, line breaks)
+
+Write the email:`;
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://www.jefferyaddae.it.com',
+          'X-Title': 'Auto Reply Generator'
+        },
+        body: JSON.stringify({
+          model: 'nvidia/nemotron-3-nano-30b-a3b:free',
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      const data = await response.json();
+      if (data.choices && data.choices[0]) {
+        return data.choices[0].message.content;
+      }
+    } catch (error) {
+      console.error('AI generation error for auto-reply:', error);
+    }
+  }
+
+  // Fallback templates based on message type
+  return generateFallbackAutoReply(firstName, messageType, priority, timeline);
+}
+
+// Fallback auto-reply templates
+function generateFallbackAutoReply(firstName, messageType, priority, timeline) {
+  const urgentNote = priority === 'Hot'
+    ? `<p><strong>I see this is time-sensitive!</strong> I'll prioritize getting back to you within 24 hours. ${timeline === 'ASAP' || timeline.includes('urgent') ? 'Given your urgent timeline, expect to hear from me very soon.' : ''}</p>`
+    : '';
+
+  const templates = {
+    automation: `<p>Hi ${firstName},</p>
+
+<p>Thanks for reaching out about automation services! 🚀</p>
+
+<p>I help businesses save 10+ hours per week by automating repetitive tasks like lead follow-ups, customer support, and data entry. Most clients see ROI within the first month.</p>
+
+${urgentNote}
+
+<p>I'd love to learn more about your specific needs. Feel free to <a href="https://www.jefferyaddae.it.com/contact">book a free 15-min call</a> on my calendar, or I'll reach out shortly.</p>
+
+<p>Best,<br>Jeffery Addae<br>
+💼 <a href="https://www.linkedin.com/in/jeffery-addae-297214398">LinkedIn</a></p>`,
+
+    website: `<p>Hi ${firstName},</p>
+
+<p>Thanks for your interest in web development! 💻</p>
+
+<p>I specialize in building modern, responsive websites and fullstack applications. Whether you need a portfolio, business site, or custom web app, I can help bring your vision to life.</p>
+
+${urgentNote}
+
+<p>Let's discuss your project! You can <a href="https://www.jefferyaddae.it.com/contact">schedule a quick call</a>, or I'll follow up with you soon.</p>
+
+<p>Best,<br>Jeffery Addae<br>
+🌐 <a href="https://www.jefferyaddae.it.com">jefferyaddae.it.com</a></p>`,
+
+    hiring: `<p>Hi ${firstName},</p>
+
+<p>Thanks for reaching out about opportunities! 🎯</p>
+
+<p>I'm a fullstack developer specializing in React, Node.js, TypeScript, and automation systems. I'm passionate about building scalable solutions that solve real business problems.</p>
+
+${urgentNote}
+
+<p>I'd love to learn more about the role. Feel free to <a href="https://www.jefferyaddae.it.com/contact">book time on my calendar</a>, or I'll get back to you shortly.</p>
+
+<p>Best,<br>Jeffery Addae<br>
+💼 <a href="https://www.linkedin.com/in/jeffery-addae-297214398">LinkedIn</a> | 🌐 <a href="https://www.jefferyaddae.it.com">Portfolio</a></p>`,
+
+    collaboration: `<p>Hi ${firstName},</p>
+
+<p>Thanks for reaching out about collaborating! 🤝</p>
+
+<p>I'm always interested in connecting with fellow developers, designers, and entrepreneurs. Whether it's partnering on projects, sharing insights, or exploring new opportunities, I'm open to the conversation.</p>
+
+${urgentNote}
+
+<p>Let's connect! You can <a href="https://www.jefferyaddae.it.com/contact">schedule a call</a>, or I'll reach out soon.</p>
+
+<p>Best,<br>Jeffery Addae<br>
+💼 <a href="https://www.linkedin.com/in/jeffery-addae-297214398">LinkedIn</a></p>`,
+
+    general: `<p>Hi ${firstName},</p>
+
+<p>Thanks for reaching out! 👋</p>
+
+<p>I appreciate you taking the time to connect. I'm a fullstack developer and automation specialist who helps businesses build modern web applications and automate their workflows.</p>
+
+${urgentNote}
+
+<p>I'll review your message and get back to you shortly. In the meantime, feel free to <a href="https://www.jefferyaddae.it.com/contact">book a time on my calendar</a> if you'd like to chat sooner.</p>
+
+<p>Best,<br>Jeffery Addae<br>
+🌐 <a href="https://www.jefferyaddae.it.com">jefferyaddae.it.com</a> | 💼 <a href="https://www.linkedin.com/in/jeffery-addae-297214398">LinkedIn</a></p>`
+  };
+
+  return templates[messageType] || templates.general;
 }
