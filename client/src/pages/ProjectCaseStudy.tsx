@@ -88,6 +88,20 @@ const ProjectCaseStudy = () => {
             <p className="text-muted-foreground">{useCase.systemBuilt}</p>
           </section>
 
+          {useCase.whoItsFor && useCase.whoItsFor.length > 0 && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Who This Is For</h2>
+              <ul className="space-y-2 text-muted-foreground">
+                {useCase.whoItsFor.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="text-primary font-bold">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section id="system-flow" className="bg-card/50 border border-border rounded-2xl p-6">
             <h2 className="text-xl font-bold text-foreground mb-3">Workflow Architecture</h2>
             <ul className="space-y-2 text-muted-foreground">
@@ -99,6 +113,57 @@ const ProjectCaseStudy = () => {
               ))}
             </ul>
           </section>
+
+          {useCase.stateFlow && useCase.stateFlow.length > 0 && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Workflow State Flow</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {useCase.stateFlow.map((state, index) => {
+                  const isLast = index === (useCase.stateFlow?.length ?? 0) - 1;
+                  return (
+                    <div key={state} className="flex items-center gap-2">
+                      <span className="rounded-lg border border-border bg-background/50 px-3 py-2 text-sm font-medium text-foreground">
+                        {state}
+                      </span>
+                      {!isLast && (
+                        <span className="text-primary font-semibold" aria-hidden="true">
+                          →
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {useCase.policyMatrix && useCase.policyMatrix.length > 0 && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Routing Matrix</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] border-collapse">
+                  <thead>
+                    <tr className="text-left border-b border-border">
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">Route Type</th>
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">Owner / Queue</th>
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">Base SLA</th>
+                      <th className="py-2 text-xs uppercase tracking-wide text-muted-foreground">Escalation Threshold</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {useCase.policyMatrix.map((row) => (
+                      <tr key={row.requestType} className="border-b border-border/60">
+                        <td className="py-3 pr-3 text-sm font-semibold text-foreground">{row.requestType}</td>
+                        <td className="py-3 pr-3 text-sm text-muted-foreground">{row.approver}</td>
+                        <td className="py-3 pr-3 text-sm text-foreground">{row.baseSla}</td>
+                        <td className="py-3 text-sm font-semibold text-primary">{row.escalationThreshold}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           <section className="bg-card/50 border border-border rounded-2xl p-6">
             <h2 className="text-xl font-bold text-foreground mb-3">Production Reliability Controls</h2>
@@ -114,10 +179,51 @@ const ProjectCaseStudy = () => {
             </div>
           </section>
 
+          {useCase.technicalHighlights && useCase.technicalHighlights.length > 0 && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Technical Highlights</h2>
+              <ul className="space-y-2 text-muted-foreground">
+                {useCase.technicalHighlights.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="text-primary font-bold">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="bg-card/50 border border-border rounded-2xl p-6">
             <h2 className="text-xl font-bold text-foreground mb-3">Outcome</h2>
             <p className="text-muted-foreground">{useCase.outcome}</p>
           </section>
+
+          {(useCase.deploymentTimeline && useCase.deploymentTimeline.length > 0) || useCase.typicalInvestment ? (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Deployment Scope</h2>
+
+              {useCase.deploymentTimeline && useCase.deploymentTimeline.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-foreground mb-2">Typical Timeline</p>
+                  <ul className="space-y-2 text-muted-foreground">
+                    {useCase.deploymentTimeline.map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {useCase.typicalInvestment && (
+                <div className="rounded-lg border border-border bg-background/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Typical Investment</p>
+                  <p className="text-base font-bold text-foreground mt-1">{useCase.typicalInvestment}</p>
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <section className="bg-card/50 border border-border rounded-2xl p-6">
             <h2 className="text-xl font-bold text-foreground mb-3">Tooling & Integrations</h2>
@@ -160,6 +266,44 @@ const ProjectCaseStudy = () => {
             </div>
           </section>
 
+          {useCase.beforeAfterMetrics && useCase.beforeAfterMetrics.length > 0 && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Before vs After</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[580px] border-collapse">
+                  <thead>
+                    <tr className="text-left border-b border-border">
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">Metric</th>
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">Before</th>
+                      <th className="py-2 pr-3 text-xs uppercase tracking-wide text-muted-foreground">After</th>
+                      <th className="py-2 text-xs uppercase tracking-wide text-muted-foreground">Improvement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {useCase.beforeAfterMetrics.map((row) => (
+                      <tr key={row.metric} className="border-b border-border/60">
+                        <td className="py-3 pr-3 text-sm font-semibold text-foreground">{row.metric}</td>
+                        <td className="py-3 pr-3 text-sm text-muted-foreground">{row.before}</td>
+                        <td className="py-3 pr-3 text-sm text-foreground">{row.after}</td>
+                        <td className="py-3 text-sm font-semibold text-primary">{row.improvement}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {useCase.testimonial && (
+            <section className="bg-card/50 border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-foreground mb-3">Client Perspective</h2>
+              <blockquote className="rounded-xl border border-border bg-background/40 p-4">
+                <p className="text-muted-foreground leading-relaxed">"{useCase.testimonial.quote}"</p>
+                <footer className="text-sm text-foreground mt-3 font-semibold">- {useCase.testimonial.attribution}</footer>
+              </blockquote>
+            </section>
+          )}
+
           <section className="bg-card/50 border border-border rounded-2xl p-6">
             <h2 className="text-xl font-bold text-foreground mb-3">Source & Workflow Files</h2>
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -201,19 +345,46 @@ const ProjectCaseStudy = () => {
             </div>
           </section>
 
-          <div className="flex flex-col sm:flex-row gap-4 mt-2">
-            <a
-              href={useCase.demoUrl}
-              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all"
-            >
-              View Live Demo
-            </a>
-            <Link href="/contact?tab=booking">
-              <span className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer">
-                Book a Free Automation ROI Audit
-              </span>
-            </Link>
-          </div>
+          {useCase.cta ? (
+            <section className="rounded-2xl border border-primary/25 bg-primary/10 p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-2">{useCase.cta.title}</h2>
+              <p className="text-muted-foreground mb-4">{useCase.cta.subtitle}</p>
+              <ul className="space-y-2 text-muted-foreground mb-6">
+                {useCase.cta.highlights.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="text-primary font-bold">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href={useCase.cta.primaryHref}>
+                  <span className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
+                    {useCase.cta.primaryLabel}
+                  </span>
+                </Link>
+                <Link href={useCase.cta.secondaryHref}>
+                  <span className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer">
+                    {useCase.cta.secondaryLabel}
+                  </span>
+                </Link>
+              </div>
+            </section>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-4 mt-2">
+              <a
+                href={useCase.demoUrl}
+                className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all"
+              >
+                View Live Demo
+              </a>
+              <Link href="/contact?tab=booking">
+                <span className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-card border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer">
+                  Book a Free Automation ROI Audit
+                </span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
