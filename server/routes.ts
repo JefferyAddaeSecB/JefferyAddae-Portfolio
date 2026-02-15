@@ -1,10 +1,11 @@
 import type { Express, Request, Response } from "express";
-import { storage } from "./storage";
+import { getStorage } from "./storage";
 import { contactMessageSchema } from "@shared/schema";
 import { leadPayloadSchema } from "@shared/lead";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { sendContactEmail } from "./services/email";
+import { isFirebaseConfigured, getFirestore } from "./firebase";
 import { handleCalendlyWebhook } from "./webhooks/calendly";
 import { getUpcomingAppointments, getPastAppointments, getAppointmentStats } from "./services/appointments";
 
@@ -60,7 +61,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const validatedData = contactMessageSchema.parse(req.body);
       
       // Save contact message to storage
-      const savedMessage = await storage.createContactMessage(validatedData);
+      const savedMessage = await getStorage().createContactMessage(validatedData);
       
       // Send email notification
       const emailResult = await sendContactEmail(validatedData);
@@ -117,10 +118,55 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(200).json({ ok: true });
       }
 
-      // Persist lead to storage (Firestore or in-memory fallback)
+      const createdAt = new Date().toISOString();
+      let savedLeadId: string | null = null;
+
+      // Try to persist the lead to Firestore if configured; this triggers Cloud Functions auto-reply
+      if (isFirebaseConfigured()) {
+        try {
+          const db = getFirestore();
+          if (db) {
+            const docRef = db.collection('leads').doc();
+            const newLead = {
+              name: payload.full_name,
+              full_name: payload.full_name,
+              email: payload.email,
+              phone: payload.phone || null,
+              company: payload.company || null,
+              role: payload.role || null,
+              inquiry_type: payload.inquiry_type || null,
+              primary_goal: payload.primary_goal || null,
+              tools_in_use: payload.tools_in_use || [],
+              message: payload.message,
+              consent: payload.consent,
+              goal: payload.primary_goal || null,
+              timeline: payload.timeline || null,
+              budget: payload.budget || null,
+              client_meta: {
+                ...clientMetaInput,
+                ip,
+                user_agent: req.get('user-agent') || '',
+                referrer: req.get('referer') || clientMetaInput.referrer || '',
+                timezone: clientMetaInput.timezone || '',
+                timestamp: createdAt,
+              },
+              createdAt,
+            };
+            await docRef.set(newLead);
+            savedLeadId = docRef.id;
+            console.log(`✅ Lead saved to Firestore: ${payload.full_name} (${savedLeadId})`);
+          }
+        } catch (storeErr) {
+          console.error('❌ Firestore save failed:', storeErr);
+        }
+      } else {
+        console.warn('⚠️ Firebase not configured, cannot save to Firestore');
+      }
+
+      // Fallback: Persist to in-memory storage as well
       let savedLead: any = null;
       try {
-        savedLead = await storage.createLead({
+        savedLead = await getStorage().createLead({
           name: payload.full_name,
           email: payload.email,
           phone: payload.phone || null,
@@ -131,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           tools: (payload.tools_in_use || []).join(", ") || payload.other_tools || null,
           volumeRange: payload.estimated_monthly_volume || null,
           message: payload.message,
-          createdAt: new Date().toISOString(),
+          createdAt,
         } as any);
       } catch (storeErr) {
         console.error('Error saving lead to storage:', storeErr);
@@ -139,11 +185,11 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Log an event in storage when possible
       try {
-        await storage.createLeadEvent({
+        await getStorage().createLeadEvent({
           leadId: savedLead?.id || Date.now(),
           eventType: 'received',
           metadata: { ip, referrer: req.get('referer') || '', userAgent: req.get('user-agent') || '' },
-          createdAt: new Date().toISOString(),
+          createdAt,
         } as any);
       } catch (evtErr) {
         console.error('Failed to write lead event:', evtErr);
@@ -156,14 +202,14 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const forwardPayload = {
         ...payload,
-        id: savedLead?.id || null,
+        id: savedLeadId || savedLead?.id || null,
         client_meta: {
           ...clientMetaInput,
           ip,
           user_agent: req.get('user-agent') || '',
           referrer: req.get('referer') || clientMetaInput.referrer || '',
           timezone: clientMetaInput.timezone || '',
-          timestamp: new Date().toISOString(),
+          timestamp: createdAt,
         },
       };
 
@@ -183,10 +229,53 @@ export async function registerRoutes(app: Express): Promise<void> {
         }
       }
 
+      // Email notifications (owner alert + auto-reply)
+      let emailResult:
+        | { success: true; info?: unknown }
+        | { success: false; emailError?: string } = {
+          success: false,
+          emailError: "Email not attempted",
+        };
+      try {
+        const leadTopic =
+          payload.primary_goal ||
+          payload.inquiry_type ||
+          payload.lead_source ||
+          "Website Inquiry";
+        emailResult = await sendContactEmail({
+          name: payload.full_name,
+          email: payload.email,
+          subject: `New Lead: ${leadTopic}`,
+          message: payload.message,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send lead emails:", emailErr);
+        emailResult = {
+          success: false,
+          emailError: emailErr instanceof Error ? emailErr.message : String(emailErr),
+        };
+      }
+
       // If a Calendly link is configured, return it (so front-end can show a scheduling CTA)
       const calendlyLink = process.env.CALENDLY_LINK || null;
+      const firebaseEnabled = isFirebaseConfigured();
+      const hasWebhookTarget = forwardTargets.length > 0;
+      const emailEnabled = emailResult.success;
+      const hasConfiguredPipeline = firebaseEnabled || hasWebhookTarget || emailEnabled;
 
-      return res.status(200).json({ ok: true, calendlyLink });
+      if (!hasConfiguredPipeline) {
+        return res.status(503).json({
+          ok: false,
+          message:
+            "Lead pipeline is not configured on server. Add FIREBASE_* and/or N8N_WEBHOOK_URL and EMAIL_* variables.",
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        calendlyLink,
+        emailSent: emailEnabled,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errorMessage = fromZodError(error).message;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { leadPayloadSchema } from "../shared/lead.js";
 import { getFirestore, isFirebaseConfigured } from "../server/firebase.js";
+import { sendContactEmail } from "../server/services/email.js";
 
 const leadRateLimit = new Map<string, { count: number; firstAt: number }>();
 const leadRateWindowMs = 10 * 60 * 1000;
@@ -111,8 +112,48 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // Email notifications (owner alert + auto-reply)
+    let emailResult:
+      | { success: true; info?: unknown }
+      | { success: false; emailError?: string } = {
+        success: false,
+        emailError: "Email not attempted",
+      };
+    try {
+      const leadTopic =
+        payload.primary_goal ||
+        payload.inquiry_type ||
+        payload.lead_source ||
+        "Website Inquiry";
+      emailResult = await sendContactEmail({
+        name: payload.full_name,
+        email: payload.email,
+        subject: `New Lead: ${leadTopic}`,
+        message: payload.message,
+      });
+    } catch (emailErr) {
+      console.error("Failed to send lead emails:", emailErr);
+      emailResult = {
+        success: false,
+        emailError: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      };
+    }
+
     const calendlyLink = process.env.CALENDLY_LINK || null;
-    return res.status(200).json({ ok: true, calendlyLink });
+    const firebaseEnabled = isFirebaseConfigured();
+    const hasWebhookTarget = forwardTargets.length > 0;
+    const emailEnabled = emailResult.success;
+    const hasConfiguredPipeline = firebaseEnabled || hasWebhookTarget || emailEnabled;
+
+    if (!hasConfiguredPipeline) {
+      return res.status(503).json({
+        ok: false,
+        message:
+          "Lead pipeline is not configured on server. Add FIREBASE_* and/or N8N_WEBHOOK_URL and EMAIL_* variables.",
+      });
+    }
+
+    return res.status(200).json({ ok: true, calendlyLink, emailSent: emailEnabled });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Invalid lead payload", errors: error.flatten() });

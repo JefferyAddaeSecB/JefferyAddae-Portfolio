@@ -45,6 +45,72 @@ const ContactForm = () => {
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const resetAfterSubmit = () => {
+    setErrors({});
+    setSubmitted(true);
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      message: "",
+      company: "",
+      role: "",
+      website: "",
+      tools: "",
+      urgency: "",
+    });
+    setTimeout(() => {
+      setSubmitted(false);
+    }, 15000);
+  };
+
+  const fallbackToContactMessages = async () => {
+    if (!isFirebaseConfigured) return false;
+
+    const fallbackPayload = {
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim(),
+      message: formData.message.trim(),
+      company: formData.company?.trim() || "",
+      role: formData.role?.trim() || "",
+      website: formData.website?.trim() || "",
+      tools: formData.tools || "",
+      urgency: formData.urgency || "",
+      source: "portfolio-contact-fallback",
+      status: "new",
+      pageUrl: typeof window !== "undefined" ? window.location.href : "",
+      createdAt: serverTimestamp(),
+    };
+
+    // Save to contactMessages (for admin record)
+    await addDoc(collection(firestore, "contactMessages"), fallbackPayload);
+    
+    // ALSO save to leads collection to trigger auto-reply Cloud Function
+    const leadPayload = {
+      name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+      email: formData.email.trim(),
+      message: formData.message.trim(),
+      company: formData.company?.trim() || null,
+      role: formData.role?.trim() || null,
+      goal: formData.tools || null,
+      timeline: formData.urgency || null,
+      source: "portfolio-contact-fallback",
+      status: "new",
+      pageUrl: typeof window !== "undefined" ? window.location.href : "",
+      createdAt: serverTimestamp(),
+    };
+    
+    try {
+      await addDoc(collection(firestore, "leads"), leadPayload);
+    } catch (err) {
+      console.error('Failed to save to leads collection:', err);
+      // Don't throw - contactMessages was already saved
+    }
+    
+    return true;
+  };
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
@@ -99,73 +165,107 @@ const ContactForm = () => {
       return;
     }
 
-    if (!isFirebaseConfigured) {
-      setErrors({
-        submit: "Form is not configured yet. Please try again later or email directly.",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
+      const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+      const toolsInUse = formData.tools ? [formData.tools] : [];
+      const sourcePage =
+        typeof window !== "undefined" ? window.location.href : "";
+      const timezone =
+        typeof Intl !== "undefined"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : "";
+      const referrer =
+        typeof document !== "undefined" ? document.referrer : "";
+
       const payload = {
-        name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
+        lead_source: "message" as const,
+        full_name: fullName,
         email: formData.email.trim(),
-        details: formData.message.trim(),
         message: formData.message.trim(),
-        company: formData.company?.trim() || "",
-        role: formData.role?.trim() || "",
-        website: formData.website?.trim() || "",
-        goal: formData.tools || "",
-        timeline: formData.urgency || "",
-        budget: "", // Optional - can be added later
-        source: "portfolio-contact",
-        status: "new",
-        pageUrl: typeof window !== "undefined" ? window.location.href : "",
-        createdAt: serverTimestamp(),
+        consent: true,
+        company: formData.company?.trim() || undefined,
+        role: formData.role?.trim() || undefined,
+        primary_goal: formData.tools || undefined,
+        tools_in_use: toolsInUse,
+        timeline: formData.urgency || undefined,
+        source_page: sourcePage,
+        client_meta: {
+          referrer,
+          timezone,
+        },
       };
 
-      const timeoutPromise = new Promise((_, reject) => {
-        window.setTimeout(() => reject(new Error("timeout")), 10000);
-      });
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+      let response: Response;
+      try {
+        response = await fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
 
-      await Promise.race([
-        addDoc(collection(firestore, "leads"), payload),
-        timeoutPromise,
-      ]);
-      setErrors({});
-      setSubmitted(true);
-      setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        message: "",
-        company: "",
-        role: "",
-        website: "",
-        tools: "",
-        urgency: "",
-      });
-      setTimeout(() => {
-        setSubmitted(false);
-      }, 15000);
+      const responseBody = await response.json().catch(() => null);
+      if (response.ok && responseBody?.ok) {
+        resetAfterSubmit();
+        return;
+      }
+
+      // If API is unavailable, fall back to client Firestore write so messages are not lost.
+      if (response.status >= 500) {
+        try {
+          const saved = await fallbackToContactMessages();
+          if (saved) {
+            resetAfterSubmit();
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error("Fallback Firestore save failed:", fallbackErr);
+        }
+      }
+
+      const message =
+        responseBody?.message ||
+        `Failed to send message (HTTP ${response.status})`;
+      throw new Error(message);
     } catch (error) {
       const errorCode = (error as { code?: string })?.code ?? "unknown";
       const errorMessage = (error as { message?: string })?.message ?? "";
       
       console.error("Contact form submission failed:", { errorCode, errorMessage, error });
+
+      // Network/proxy failure fallback
+      try {
+        const saved = await fallbackToContactMessages();
+        if (saved) {
+          resetAfterSubmit();
+          return;
+        }
+      } catch (fallbackErr) {
+        console.error("Fallback Firestore save failed:", fallbackErr);
+      }
       
       let message = "Something went wrong while sending. Please try again or email directly.";
       
-      if (errorCode === "permission-denied") {
-        message = "Firebase permissions issue. Please contact support.";
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        message = "Connection timeout. Please check your internet and try again.";
       } else if (errorCode === "unavailable" || errorMessage.includes("timeout")) {
         message = "Connection timeout. Please check your internet and try again.";
+      } else if (errorMessage.includes("Too many submissions")) {
+        message = "Too many submissions. Please try again shortly.";
       } else if (errorCode === "unauthenticated") {
         message = "Authentication issue. Please refresh and try again.";
+      } else if (errorMessage) {
+        message = errorMessage;
       }
       
       setErrors({
@@ -194,12 +294,6 @@ const ContactForm = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      {errors.submit && (
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded p-3">
-          <p className="text-sm text-red-800 dark:text-red-200">{errors.submit}</p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="firstName" className="text-sm font-medium">
@@ -378,6 +472,12 @@ const ContactForm = () => {
       <p className="text-xs text-muted-foreground">
         * Required fields
       </p>
+
+      {errors.submit && (
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded p-3">
+          <p className="text-sm text-red-800 dark:text-red-200">{errors.submit}</p>
+        </div>
+      )}
     </form>
   );
 };

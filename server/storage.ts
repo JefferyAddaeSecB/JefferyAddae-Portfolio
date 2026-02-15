@@ -172,18 +172,35 @@ export class FirestoreStorage implements IStorage {
   }
 }
 
-let storageInstance: IStorage;
-if (isFirebaseConfigured()) {
-  try {
-    storageInstance = new FirestoreStorage();
-    console.log('✅ Using FirestoreStorage for persistence');
-  } catch (err) {
-    console.error('Failed to initialize FirestoreStorage, falling back to MemStorage', err);
+let storageInstance: IStorage | null = null;
+
+function initializeStorage(): IStorage {
+  if (storageInstance) {
+    return storageInstance;
+  }
+  
+  if (isFirebaseConfigured()) {
+    try {
+      storageInstance = new FirestoreStorage();
+      console.log('✅ Using FirestoreStorage for persistence');
+    } catch (err) {
+      console.error('Failed to initialize FirestoreStorage, falling back to MemStorage', err);
+      storageInstance = new MemStorage();
+    }
+  } else {
+    console.warn('⚠️ Firebase not configured, using in-memory storage (MemStorage)');
     storageInstance = new MemStorage();
   }
-} else {
-  console.warn('Firebase not configured, using in-memory storage (MemStorage)');
-  storageInstance = new MemStorage();
+  
+  return storageInstance;
 }
 
-export const storage = storageInstance;
+export { initializeStorage };
+
+export const getStorage = () => {
+  if (!storageInstance) {
+    initializeStorage();
+  }
+  return storageInstance!;
+};
+

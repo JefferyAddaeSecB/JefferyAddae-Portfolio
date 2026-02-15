@@ -5,11 +5,23 @@ function getEnvVar(name: string): string | undefined {
 }
 
 export function isFirebaseConfigured(): boolean {
-  return !!(
-    getEnvVar('FIREBASE_PROJECT_ID') &&
-    getEnvVar('FIREBASE_CLIENT_EMAIL') &&
-    getEnvVar('FIREBASE_PRIVATE_KEY')
-  );
+  const projectId = getEnvVar('FIREBASE_PROJECT_ID');
+  const clientEmail = getEnvVar('FIREBASE_CLIENT_EMAIL');
+  const privateKey = getEnvVar('FIREBASE_PRIVATE_KEY');
+  
+  const isConfigured = !!(projectId && clientEmail && privateKey);
+  
+  console.log('[Firebase Debug]', {
+    hasProjectId: !!projectId,
+    hasClientEmail: !!clientEmail,
+    hasPrivateKey: !!privateKey,
+    isConfigured,
+    projectId: projectId || 'MISSING',
+    clientEmail: clientEmail ? clientEmail.substring(0, 30) + '...' : 'MISSING',
+    privateKeyLength: privateKey?.length || 0
+  });
+  
+  return isConfigured;
 }
 
 export function initFirebase() {

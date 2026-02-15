@@ -27,6 +27,9 @@ console.log('Environment Configuration:', {
   NODE_ENV: process.env.NODE_ENV,
   EMAIL_USER: process.env.EMAIL_USER,
   HAS_EMAIL_PASSWORD: !!process.env.EMAIL_PASSWORD,
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+  HAS_FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
   PORT: process.env.PORT || 3000
 });
 
