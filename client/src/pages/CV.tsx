@@ -157,7 +157,7 @@ const CV = () => {
           <div className="flex flex-col">
             <h1 className="text-4xl md:text-5xl font-bold text-primary">JEFFERY ADDAE</h1>
             <p className="text-muted-foreground text-base md:text-lg mt-2">
-              AI Automation Engineer | Full-Stack Developer
+              AI Voice & Automation Specialist | Full-Stack Developer
             </p>
             <p className="text-muted-foreground text-sm mt-2">
               Toronto, Ontario, Canada
@@ -191,9 +191,7 @@ const CV = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-primary mb-2">PROFESSIONAL SUMMARY</h3>
                   <p className="text-foreground/80">
-                    AI Automation Engineer and Full-Stack Developer specializing in workflow automation, AI systems, and scalable web applications.
-                    Experienced in building production-ready n8n automations, backend services, and AI-powered tools that reduce manual work,
-                    improve operational efficiency, and support business growth.
+                    AI Voice & Automation Specialist and Full-Stack Developer focused on building AI phone agents, voice automation systems, and production-grade workflow automation. Experienced in deploying inbound/outbound AI call agents, n8n automation pipelines, and AI-powered tools that reduce manual work and scale operations without additional headcount.
                   </p>
                 </div>
 
@@ -266,7 +264,7 @@ const CV = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-primary mb-2">TECHNICAL SKILLS</h3>
                   <div className="space-y-2 text-foreground/80">
-                    <p><span className="font-semibold text-foreground">Automation & AI:</span> n8n, OpenAI API, Webhooks, AI Assistants</p>
+                    <p><span className="font-semibold text-foreground">Automation & AI:</span> n8n, OpenAI API, Vapi, Bland.ai, Twilio, Webhooks, AI Voice Agents</p>
                     <p><span className="font-semibold text-foreground">Frontend:</span> React, TypeScript, Tailwind CSS, Next.js</p>
                     <p><span className="font-semibold text-foreground">Backend:</span> Node.js, REST APIs, Supabase, PostgreSQL, Firebase</p>
                     <p><span className="font-semibold text-foreground">Tools:</span> Git/GitHub, Notion, Slack, Google Workspace, Vercel</p>

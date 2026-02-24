@@ -3,6 +3,11 @@
 // ================================
 export const CORE_SKILLS = [
   {
+    name: "AI Voice & Call Agents",
+    description: "Inbound & outbound phone AI. Qualifies leads, books calls, answers questions — no human needed.",
+    percentage: 94,
+  },
+  {
     name: "Lead Automation",
     description: "Capture, qualify, route. Never lose a lead again.",
     percentage: 92,

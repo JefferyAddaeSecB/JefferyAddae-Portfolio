@@ -85,10 +85,10 @@ const Footer = () => {
               What I Do
             </h3>
             <div className="flex flex-col space-y-3 text-muted-foreground">
+              <span>AI voice & phone agents</span>
               <span>AI automation workflows (n8n)</span>
-              <span>Business process automation</span>
+              <span>Lead qualification systems</span>
               <span>AI chatbots & internal tools</span>
-              <span>Full-stack web applications</span>
               <span>API & system integrations</span>
             </div>
           </div>

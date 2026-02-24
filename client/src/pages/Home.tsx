@@ -29,7 +29,7 @@ const Home = () => {
                 transition={{ duration: 0.5 }}
                 className="inline-block mb-4 px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-semibold"
               >
-                👋 I help businesses eliminate time leaks with AI.
+                🎙️ AI Voice Agents & Automation for Service Businesses
               </motion.div>
 
               <h1 className="text-5xl md:text-7xl font-bold mb-4 leading-tight">
@@ -39,12 +39,12 @@ const Home = () => {
               </h1>
 
               <p className="text-base sm:text-lg text-muted-foreground mb-2 max-w-xl mx-auto lg:mx-0">
-                I design and deploy production-ready AI automation systems using n8n to eliminate manual work across lead intake, follow-ups, reporting, and internal ops — so service businesses and agencies scale without hiring.
+                I build AI phone agents and automation systems that answer calls, qualify leads, book appointments, and run your ops 24/7 — so your business scales without hiring.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 mb-6 justify-center lg:justify-start">
                 <span className="text-xs uppercase tracking-wide text-muted-foreground">Best for</span>
-                {["Service Businesses", "SaaS Teams", "Agencies"].map((item) => (
+                {["Service Businesses", "Sales Teams", "Recruitment Agencies"].map((item) => (
                   <span
                     key={item}
                     className="px-3 py-1 rounded-full bg-card border border-border text-sm text-foreground"
@@ -144,8 +144,19 @@ const Home = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
+              {
+                icon: (
+                  <svg className="w-10 h-10 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.78.68 2.61a2 2 0 0 1-.45 2.11L8.1 9.67a16 16 0 0 0 6.23 6.23l1.23-1.24a2 2 0 0 1 2.11-.45c.83.33 1.71.56 2.61.68A2 2 0 0 1 22 16.92z" />
+                    <path d="M14.5 3.5a6 6 0 0 1 6 6" />
+                    <path d="M14.5 7.5a2 2 0 0 1 2 2" />
+                  </svg>
+                ),
+                title: "AI Voice & Phone Agents",
+                desc: "Deploy AI agents that answer inbound calls, make outbound follow-ups, qualify leads in real time, and book appointments — fully automated, 24/7.",
+              },
               {
                 icon: (
                   <svg className="w-10 h-10 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -233,6 +244,10 @@ const Home = () => {
             { name: "OpenAI", icon: "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/openai.svg", color: "#412991" },
             { name: "LangChain", icon: "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/langchain.svg", color: "#0ea5e9" },
             { name: "Zapier", icon: "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/zapier.svg", color: "#ff4f00" },
+            { name: "Vapi", emoji: "📞", color: "#2563eb" },
+            { name: "Bland.ai", emoji: "🗣️", color: "#0f172a" },
+            { name: "Twilio", icon: "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twilio.svg", color: "#f22f46" },
+            { name: "ElevenLabs", icon: "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/elevenlabs.svg", color: "#111827" },
           ].map((t) => (
             <motion.div
               key={t.name}
@@ -243,7 +258,11 @@ const Home = () => {
               className="bg-background/40 rounded-xl p-4 border border-border hover:border-primary/50 transition-all duration-300 flex items-center gap-3"
             >
               <div style={{ width: "32px", height: "32px", backgroundColor: t.color, borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <img src={t.icon} alt={t.name} className="w-6 h-6 rounded invert" />
+                {t.icon ? (
+                  <img src={t.icon} alt={t.name} className="w-6 h-6 rounded invert" />
+                ) : (
+                  <span className="text-base leading-none" aria-hidden="true">{t.emoji}</span>
+                )}
               </div>
               <span className="text-sm font-medium text-foreground">{t.name}</span>
             </motion.div>

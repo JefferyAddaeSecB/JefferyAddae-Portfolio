@@ -47,7 +47,7 @@ const Header = () => {
                 Jeffery Addae
               </div>
               <div className="hidden sm:block text-xs md:text-sm text-muted-foreground">
-                AI Automation • Full-Stack Systems
+                AI Voice Agents • Automation Systems
               </div>
             </div>
           </Link>

@@ -275,10 +275,10 @@ export default function ChatAssistant() {
   };
 
   const quickMessages = [
+    { text: 'Do you build AI call agents?', icon: '📞' },
     { text: 'What services do you offer?', icon: '🛠️' },
-    { text: 'Tell me about your experience', icon: '📊' },
     { text: 'How does your process work?', icon: '⚙️' },
-    { text: 'I want to book a call', icon: '📅' }
+    { text: 'Book a free ROI Audit', icon: '📅' }
   ];
 
   const handleRefresh = () => {
@@ -473,12 +473,9 @@ export default function ChatAssistant() {
                   {/* AI System Avatar */}
                   <AiSystemAvatar className="h-9 w-9" />
 
-                  {/* Title and Beta Badge */}
+                  {/* Title */}
                   <div className="flex items-center gap-1.5 min-w-0">
                     <h3 className="font-semibold text-base whitespace-nowrap">Jeffery AI</h3>
-                    <span className="px-2 py-0.5 bg-white/20 text-white/70 text-[10px] font-medium rounded-full flex-shrink-0">
-                      BETA
-                    </span>
                   </div>
                 </div>
 
@@ -533,10 +530,10 @@ export default function ChatAssistant() {
                     <HumanSupportAvatar className="h-8 w-8 mt-1" />
                     <div className="max-w-[85%] bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600 p-4 rounded-[20px] shadow-[0_10px_26px_rgba(15,23,42,0.11)]">
                       <p className="font-semibold text-base">
-                        Hi — I'm Jeffery's automation assistant.
+                        Hi — I'm Jeffery's AI assistant.
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 leading-relaxed">
-                        I help businesses design and implement AI systems that save time and increase revenue.
+                        Jeffery builds AI voice agents and automation systems that handle calls, qualify leads, and run your ops 24/7. What can I help you with?
                       </p>
                     </div>
                   </div>
@@ -647,7 +644,7 @@ export default function ChatAssistant() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Ask about Jeffery & AI automation..."
+                  placeholder="Ask about AI voice agents, automation..."
                   className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 resize-none overflow-hidden"
                   rows={1}
                   disabled={isLoading}
