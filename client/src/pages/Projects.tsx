@@ -21,17 +21,11 @@ const badgeClasses: Record<UseCaseCategory, string> = {
 
 const Projects = () => {
   const [filter, setFilter] = useState<FilterCategory>("All");
-  const [activeUseCaseSlug, setActiveUseCaseSlug] = useState(USE_CASES[0].slug);
 
   const filteredCases = useMemo(() => {
     if (filter === "All") return USE_CASES;
     return USE_CASES.filter((useCase) => useCase.category === filter);
   }, [filter]);
-
-  const activeUseCase = useMemo(
-    () => USE_CASES.find((useCase) => useCase.slug === activeUseCaseSlug) || USE_CASES[0],
-    [activeUseCaseSlug]
-  );
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -196,132 +190,6 @@ const Projects = () => {
               </div>
             </motion.article>
           ))}
-        </section>
-
-        <section className="mt-16 sm:mt-20">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
-              Technical Pattern Deep Dive
-            </h2>
-            <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto">
-              Pick a use case below to inspect architecture decisions, reliability controls,
-              and source file references.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {USE_CASES.map((useCase) => {
-              const isActive = useCase.slug === activeUseCaseSlug;
-              return (
-                <button
-                  key={useCase.slug}
-                  onClick={() => setActiveUseCaseSlug(useCase.slug)}
-                  className={`text-left bg-card border rounded-xl p-5 transition-all ${
-                    isActive
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <p className={`font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
-                    {useCase.title}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">{useCase.oneLiner}</p>
-                </button>
-              );
-            })}
-          </div>
-
-          <motion.div
-            key={activeUseCase.slug}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            className="mt-10 bg-card border border-border rounded-2xl p-6 sm:p-8"
-          >
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeClasses[activeUseCase.category]}`}>
-                {activeUseCase.category}
-              </span>
-              <span className="px-3 py-1 rounded-full text-xs bg-primary/10 text-primary">
-                Production-Ready Pattern
-              </span>
-              <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/15 text-emerald-400">
-                AI-Assisted
-              </span>
-              <span className="px-3 py-1 rounded-full text-xs bg-sky-500/15 text-sky-400">
-                Deterministic Fallback
-              </span>
-              <span className="px-3 py-1 rounded-full text-xs bg-amber-500/15 text-amber-400">
-                n8n Import-Tested
-              </span>
-            </div>
-
-            <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">{activeUseCase.title}</h3>
-            <p className="text-muted-foreground text-lg">{activeUseCase.oneLiner}</p>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-              <div>
-                <h4 className="text-lg font-semibold text-foreground mb-2">Problem</h4>
-                <p className="text-muted-foreground mb-5">{activeUseCase.problem}</p>
-                <h4 className="text-lg font-semibold text-foreground mb-2">System Built</h4>
-                <p className="text-muted-foreground">{activeUseCase.systemBuilt}</p>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-foreground mb-2">Workflow Steps</h4>
-                <ul className="space-y-2 text-muted-foreground">
-                  {activeUseCase.workflowSteps.map((step) => (
-                    <li key={step} className="flex gap-2">
-                      <span className="text-primary font-bold">•</span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <h4 className="text-lg font-semibold text-foreground mb-2">Reliability Controls</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {activeUseCase.reliabilityControls.map((control) => (
-                  <div key={control} className="rounded-lg border border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground">
-                    {control}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <h4 className="text-lg font-semibold text-foreground mb-2">Outcome</h4>
-              <p className="text-muted-foreground">{activeUseCase.outcome}</p>
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href={activeUseCase.repoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold hover:bg-background transition-all"
-              >
-                <FaGithub />
-                <span>Open Repo</span>
-              </a>
-              <a
-                href={activeUseCase.workflowJsonPath}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold hover:bg-background transition-all"
-              >
-                <FaCode />
-                <span>View Workflow JSON</span>
-              </a>
-              <Link href={`/projects/${activeUseCase.slug}`}>
-                <span className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-white font-semibold hover:opacity-90 transition-all cursor-pointer">
-                  Open Full Case Study
-                </span>
-              </Link>
-            </div>
-          </motion.div>
         </section>
 
         <section className="mt-16 sm:mt-20">

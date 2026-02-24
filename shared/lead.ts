@@ -8,6 +8,7 @@ export const leadPayloadSchema = z.object({
   consent: z.boolean(),
   phone: z.string().optional(),
   company: z.string().optional(),
+  website: z.string().optional(),
   role: z.string().optional(),
   inquiry_type: z.string().optional(),
   primary_goal: z.string().optional(),

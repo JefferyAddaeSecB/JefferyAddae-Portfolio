@@ -211,7 +211,7 @@ if (n8nUrl) {
 
 **Update `.env`:**
 ```
-N8N_LEAD_WEBHOOK_URL=https://your-n8n.app/webhook/portfolio-lead
+N8N_LEAD_WEBHOOK_URL=https://your-n8n.app/webhook/portfolio-lead-v4
 ```
 
 **Test it:**
@@ -318,10 +318,13 @@ Personalization note: _______
 - If no → Adjust copy, subject lines, targeting
 
 **N8N Automation:**
-1. Import `automation/n8n-workflows/02-cold-outreach-automation.json`
+1. Import one outreach workflow:
+   - `automation/n8n-workflows/06-canada-service-prospecting-agentic-outreach.json` (Canada discovery + outreach)
+   - `automation/n8n-workflows/07-hunter-prospecting-branded-outreach.json` (domain list + outreach)
+2. Import `automation/n8n-workflows/08-unsubscribe-suppression-handler.json` (unsubscribe + suppression)
 2. Set schedule: Daily at 9am
 3. Batch size: 10-50 prospects/day
-4. Auto follow-ups: Day 3, Day 6, Day 9, Day 12
+4. Auto follow-ups: configured in the workflow (default 4-7 days)
 
 **Campaign Tracking:**
 ```

@@ -1,4 +1,17 @@
-# 🚀 QUICK START - Deploy in 15 Minutes
+# ⚠️ QUICK START (Deprecated Firebase Flow)
+
+This document describes the old Firebase-based scraping and outreach system.
+
+Current production direction:
+- Use n8n for prospect discovery
+- Use n8n for cold outreach/follow-ups
+- Use n8n for contact-form auto-response
+
+For Firebase cleanup commands, see `automation/firebase-functions/README.md`.
+
+---
+
+# 🚀 LEGACY QUICK START - Deploy in 15 Minutes
 
 ## ✅ **Step-by-Step Setup**
 
@@ -57,7 +70,7 @@ nano .env
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASSWORD=your-gmail-app-password
 ADMIN_EMAIL=your-gmail@gmail.com
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=sk-or-v1-your-key
 ```
 
 **How to get Gmail App Password:**
@@ -76,7 +89,7 @@ firebase functions:config:set \
   email.user="your-gmail@gmail.com" \
   email.password="your-app-password" \
   email.admin="your-gmail@gmail.com" \
-  openrouter.key="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"
+  openrouter.key="sk-or-v1-your-key"
 ```
 
 ---

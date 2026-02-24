@@ -53,8 +53,9 @@ nano .env
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASSWORD=your-gmail-app-password
 ADMIN_EMAIL=your-gmail@gmail.com
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=sk-or-v1-your-key
 ```
+Note: Never commit real API keys to the repo. Use placeholders like `sk-or-v1-your-key`.
 
 **Important:** For Gmail password, use an **App Password**:
 1. Go to: https://myaccount.google.com/apppasswords

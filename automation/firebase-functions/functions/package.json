@@ -1,7 +1,7 @@
 {
   "name": "portfolio-automation",
   "version": "1.0.0",
-  "description": "Automated lead generation and cold outreach system",
+  "description": "Deprecated Firebase functions (migrated to n8n workflows)",
   "main": "index.js",
   "engines": {
     "node": "20"

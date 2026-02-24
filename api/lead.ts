@@ -1,7 +1,5 @@
 import { z } from "zod";
 import { leadPayloadSchema } from "../shared/lead.js";
-import { getFirestore, isFirebaseConfigured } from "../server/firebase.js";
-import { sendContactEmail } from "../server/services/email.js";
 
 const leadRateLimit = new Map<string, { count: number; firstAt: number }>();
 const leadRateWindowMs = 10 * 60 * 1000;
@@ -41,138 +39,89 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ ok: true });
     }
 
-    // Try to persist the lead to Firestore if configured; otherwise just forward
-    let savedLeadId: string | number | null = null;
-    if (isFirebaseConfigured()) {
-      try {
-        const db = getFirestore();
-        if (db) {
-          const createdAt = new Date().toISOString();
-          const docRef = db.collection('leads').doc();
-
-          // Split name for firstName
-          const nameParts = payload.full_name.split(' ');
-          const firstName = nameParts[0] || payload.full_name;
-
-          const newLead = {
-            // Fields for Firebase Function compatibility
-            name: payload.full_name,
-            firstName: firstName,
-            lastName: nameParts.slice(1).join(' ') || '',
-            email: payload.email,
-            phone: payload.phone || null,
-            company: payload.company || null,
-            role: payload.role || null,
-            details: payload.message, // Map message -> details for function
-            message: payload.message, // Keep original for compatibility
-            goal: payload.primary_goal || null, // Map primary_goal -> goal for function
-            timeline: payload.timeline || null,
-            budget: payload.budget_range || null, // Map budget_range -> budget for function
-            consent: payload.consent,
-
-            // Original fields for backward compatibility
-            full_name: payload.full_name,
-            inquiry_type: payload.inquiry_type || null,
-            primary_goal: payload.primary_goal || null,
-            tools_in_use: payload.tools_in_use || [],
-
-            // Meta & tracking
-            source: 'portfolio-contact-api',
-            status: 'new',
-            client_meta: {
-              ...clientMetaInput,
-              ip,
-              user_agent: req.headers?.["user-agent"] || "",
-              referrer: req.headers?.referer || clientMetaInput.referrer || "",
-              timezone: clientMetaInput.timezone || "",
-              timestamp: createdAt,
-            },
-            createdAt,
-          };
-          await docRef.set(newLead);
-          savedLeadId = docRef.id;
-        }
-      } catch (storeErr) {
-        console.error('Firestore save failed:', storeErr);
-      }
+    const createdAt = new Date().toISOString();
+    const forwardTargets: { name: string; url: string }[] = [];
+    const n8nLeadWebhookUrl = process.env.N8N_WEBHOOK_URL || process.env.N8N_LEAD_WEBHOOK_URL;
+    if (n8nLeadWebhookUrl) {
+      forwardTargets.push({ name: "n8n", url: n8nLeadWebhookUrl });
+    }
+    if (process.env.CALENDLY_WEBHOOK_URL) {
+      forwardTargets.push({ name: "calendly", url: process.env.CALENDLY_WEBHOOK_URL });
     }
 
-    // Forward to configured automation endpoints (n8n, Calendly) if present
-    const forwardTargets: { name: string; url?: string }[] = [];
-    if (process.env.N8N_WEBHOOK_URL) forwardTargets.push({ name: 'n8n', url: process.env.N8N_WEBHOOK_URL });
-    if (process.env.CALENDLY_WEBHOOK_URL) forwardTargets.push({ name: 'calendly', url: process.env.CALENDLY_WEBHOOK_URL });
+    if (forwardTargets.length === 0) {
+      return res.status(503).json({
+        ok: false,
+        message:
+          "Lead pipeline is not configured. Add N8N_WEBHOOK_URL (or N8N_LEAD_WEBHOOK_URL), and optionally CALENDLY_WEBHOOK_URL.",
+      });
+    }
 
     const forwardPayload = {
       ...payload,
-      id: savedLeadId,
+      id: null,
       client_meta: {
         ...clientMetaInput,
         ip,
         user_agent: req.headers?.["user-agent"] || "",
         referrer: req.headers?.referer || clientMetaInput.referrer || "",
         timezone: clientMetaInput.timezone || "",
-        timestamp: new Date().toISOString(),
+        timestamp: createdAt,
       },
     };
 
+    const includeForwardBodies = String(process.env.LEAD_FORWARD_DEBUG || "").trim() === "1";
+    const forwardResults: Array<{ name: string; ok: boolean; status?: number; body?: unknown }> = [];
+
     for (const target of forwardTargets) {
       try {
-        const response = await fetch(target.url!, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const response = await fetch(target.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(forwardPayload),
         });
+
         if (!response.ok) {
-          const errText = await response.text().catch(() => '');
+          const errText = await response.text().catch(() => "");
           console.error(`${target.name} webhook error:`, response.status, errText);
+          forwardResults.push({
+            name: target.name,
+            ok: false,
+            status: response.status,
+            ...(includeForwardBodies ? { body: errText } : {}),
+          });
+          continue;
         }
+
+        if (includeForwardBodies) {
+          const text = await response.text().catch(() => "");
+          let parsed: unknown = text;
+          try {
+            parsed = text ? JSON.parse(text) : text;
+          } catch {}
+
+          forwardResults.push({ name: target.name, ok: true, status: response.status, body: parsed });
+          continue;
+        }
+
+        forwardResults.push({ name: target.name, ok: true, status: response.status });
       } catch (fErr) {
         console.error(`Failed to forward lead to ${target.name}:`, fErr);
+        forwardResults.push({ name: target.name, ok: false });
       }
     }
 
-    // Email notifications (owner alert + auto-reply)
-    let emailResult:
-      | { success: true; info?: unknown }
-      | { success: false; emailError?: string } = {
-        success: false,
-        emailError: "Email not attempted",
-      };
-    try {
-      const leadTopic =
-        payload.primary_goal ||
-        payload.inquiry_type ||
-        payload.lead_source ||
-        "Website Inquiry";
-      emailResult = await sendContactEmail({
-        name: payload.full_name,
-        email: payload.email,
-        subject: `New Lead: ${leadTopic}`,
-        message: payload.message,
+    const hasSuccessfulForward = forwardResults.some((result) => result.ok);
+    if (!hasSuccessfulForward) {
+      return res.status(502).json({
+        ok: false,
+        message: "Lead was received but forwarding to automation webhooks failed.",
+        forwarded: forwardResults,
       });
-    } catch (emailErr) {
-      console.error("Failed to send lead emails:", emailErr);
-      emailResult = {
-        success: false,
-        emailError: emailErr instanceof Error ? emailErr.message : String(emailErr),
-      };
     }
 
     const calendlyLink = process.env.CALENDLY_LINK || null;
-    const firebaseEnabled = isFirebaseConfigured();
-    const hasWebhookTarget = forwardTargets.length > 0;
-    const emailEnabled = emailResult.success;
-    const hasConfiguredPipeline = firebaseEnabled || hasWebhookTarget || emailEnabled;
-
-    if (!hasConfiguredPipeline) {
-      return res.status(503).json({
-        ok: false,
-        message:
-          "Lead pipeline is not configured on server. Add FIREBASE_* and/or N8N_WEBHOOK_URL and EMAIL_* variables.",
-      });
-    }
-
-    return res.status(200).json({ ok: true, calendlyLink, emailSent: emailEnabled });
+    return res.status(200).json({ ok: true, calendlyLink, forwarded: forwardResults });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Invalid lead payload", errors: error.flatten() });

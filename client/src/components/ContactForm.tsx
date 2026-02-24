@@ -85,29 +85,7 @@ const ContactForm = () => {
 
     // Save to contactMessages (for admin record)
     await addDoc(collection(firestore, "contactMessages"), fallbackPayload);
-    
-    // ALSO save to leads collection to trigger auto-reply Cloud Function
-    const leadPayload = {
-      name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-      email: formData.email.trim(),
-      message: formData.message.trim(),
-      company: formData.company?.trim() || null,
-      role: formData.role?.trim() || null,
-      goal: formData.tools || null,
-      timeline: formData.urgency || null,
-      source: "portfolio-contact-fallback",
-      status: "new",
-      pageUrl: typeof window !== "undefined" ? window.location.href : "",
-      createdAt: serverTimestamp(),
-    };
-    
-    try {
-      await addDoc(collection(firestore, "leads"), leadPayload);
-    } catch (err) {
-      console.error('Failed to save to leads collection:', err);
-      // Don't throw - contactMessages was already saved
-    }
-    
+
     return true;
   };
 
@@ -186,6 +164,7 @@ const ContactForm = () => {
         message: formData.message.trim(),
         consent: true,
         company: formData.company?.trim() || undefined,
+        website: formData.website?.trim() || undefined,
         role: formData.role?.trim() || undefined,
         primary_goal: formData.tools || undefined,
         tools_in_use: toolsInUse,

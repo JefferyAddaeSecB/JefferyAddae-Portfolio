@@ -4,8 +4,6 @@ import { contactMessageSchema } from "@shared/schema";
 import { leadPayloadSchema } from "@shared/lead";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { sendContactEmail } from "./services/email";
-import { isFirebaseConfigured, getFirestore } from "./firebase";
 import { handleCalendlyWebhook } from "./webhooks/calendly";
 import { getUpcomingAppointments, getPastAppointments, getAppointmentStats } from "./services/appointments";
 
@@ -28,30 +26,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Test email endpoint
   app.get("/api/test-email", async (req: Request, res: Response) => {
-    try {
-      const testData = {
-        name: "Test User",
-        email: "test@example.com",
-        subject: "Test Email",
-        message: "This is a test email from your portfolio contact form."
-      };
-
-      const emailResult = await sendContactEmail(testData);
-      if (!emailResult.success) {
-        return res.status(500).json({ 
-          message: "Failed to send test email",
-          error: emailResult.emailError || "Email configuration is missing or invalid"
-        });
-      }
-
-      return res.status(200).json({ message: "Test email sent successfully" });
-    } catch (error) {
-      console.error("Error sending test email:", error);
-      return res.status(500).json({ 
-        message: "Failed to send test email",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
+    return res.status(410).json({
+      message: "SMTP email testing is disabled. Use n8n workflows for outbound messaging.",
+    });
   });
   
   // API route for contact form submissions
@@ -62,16 +39,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       // Save contact message to storage
       const savedMessage = await getStorage().createContactMessage(validatedData);
-      
-      // Send email notification
-      const emailResult = await sendContactEmail(validatedData);
-      if (!emailResult.success) {
-        return res.status(500).json({
-          message: "Failed to send email",
-          error: emailResult.emailError || "Email configuration is missing or invalid"
-        });
-      }
-      
+
       // Return success response
       return res.status(201).json({ 
         message: "Message received successfully", 
@@ -119,49 +87,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       const createdAt = new Date().toISOString();
-      let savedLeadId: string | null = null;
-
-      // Try to persist the lead to Firestore if configured; this triggers Cloud Functions auto-reply
-      if (isFirebaseConfigured()) {
-        try {
-          const db = getFirestore();
-          if (db) {
-            const docRef = db.collection('leads').doc();
-            const newLead = {
-              name: payload.full_name,
-              full_name: payload.full_name,
-              email: payload.email,
-              phone: payload.phone || null,
-              company: payload.company || null,
-              role: payload.role || null,
-              inquiry_type: payload.inquiry_type || null,
-              primary_goal: payload.primary_goal || null,
-              tools_in_use: payload.tools_in_use || [],
-              message: payload.message,
-              consent: payload.consent,
-              goal: payload.primary_goal || null,
-              timeline: payload.timeline || null,
-              budget: payload.budget || null,
-              client_meta: {
-                ...clientMetaInput,
-                ip,
-                user_agent: req.get('user-agent') || '',
-                referrer: req.get('referer') || clientMetaInput.referrer || '',
-                timezone: clientMetaInput.timezone || '',
-                timestamp: createdAt,
-              },
-              createdAt,
-            };
-            await docRef.set(newLead);
-            savedLeadId = docRef.id;
-            console.log(`✅ Lead saved to Firestore: ${payload.full_name} (${savedLeadId})`);
-          }
-        } catch (storeErr) {
-          console.error('❌ Firestore save failed:', storeErr);
-        }
-      } else {
-        console.warn('⚠️ Firebase not configured, cannot save to Firestore');
-      }
 
       // Fallback: Persist to in-memory storage as well
       let savedLead: any = null;
@@ -196,13 +121,26 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Forward to external automation endpoint(s) if configured
-      const forwardTargets: { name: string; url?: string }[] = [];
-      if (process.env.N8N_WEBHOOK_URL) forwardTargets.push({ name: 'n8n', url: process.env.N8N_WEBHOOK_URL });
-      if (process.env.CALENDLY_WEBHOOK_URL) forwardTargets.push({ name: 'calendly', url: process.env.CALENDLY_WEBHOOK_URL });
+      const forwardTargets: { name: string; url: string }[] = [];
+      const n8nLeadWebhookUrl = process.env.N8N_WEBHOOK_URL || process.env.N8N_LEAD_WEBHOOK_URL;
+      if (n8nLeadWebhookUrl) {
+        forwardTargets.push({ name: 'n8n', url: n8nLeadWebhookUrl });
+      }
+      if (process.env.CALENDLY_WEBHOOK_URL) {
+        forwardTargets.push({ name: 'calendly', url: process.env.CALENDLY_WEBHOOK_URL });
+      }
+
+      if (forwardTargets.length === 0) {
+        return res.status(503).json({
+          ok: false,
+          message:
+            "Lead pipeline is not configured on server. Add N8N_WEBHOOK_URL (or N8N_LEAD_WEBHOOK_URL), and optionally CALENDLY_WEBHOOK_URL.",
+        });
+      }
 
       const forwardPayload = {
         ...payload,
-        id: savedLeadId || savedLead?.id || null,
+        id: savedLead?.id || null,
         client_meta: {
           ...clientMetaInput,
           ip,
@@ -213,9 +151,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         },
       };
 
+      const forwardResults: Array<{ name: string; ok: boolean; status?: number }> = [];
+
       for (const target of forwardTargets) {
         try {
-          const response = await fetch(target.url!, {
+          const response = await fetch(target.url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(forwardPayload),
@@ -223,58 +163,32 @@ export async function registerRoutes(app: Express): Promise<void> {
           if (!response.ok) {
             const errText = await response.text().catch(() => '');
             console.error(`${target.name} webhook error:`, response.status, errText);
+            forwardResults.push({ name: target.name, ok: false, status: response.status });
+            continue;
           }
+          forwardResults.push({ name: target.name, ok: true, status: response.status });
         } catch (fErr) {
           console.error(`Failed to forward lead to ${target.name}:`, fErr);
+          forwardResults.push({ name: target.name, ok: false });
         }
       }
 
-      // Email notifications (owner alert + auto-reply)
-      let emailResult:
-        | { success: true; info?: unknown }
-        | { success: false; emailError?: string } = {
-          success: false,
-          emailError: "Email not attempted",
-        };
-      try {
-        const leadTopic =
-          payload.primary_goal ||
-          payload.inquiry_type ||
-          payload.lead_source ||
-          "Website Inquiry";
-        emailResult = await sendContactEmail({
-          name: payload.full_name,
-          email: payload.email,
-          subject: `New Lead: ${leadTopic}`,
-          message: payload.message,
+      const hasSuccessfulForward = forwardResults.some((result) => result.ok);
+      if (!hasSuccessfulForward) {
+        return res.status(502).json({
+          ok: false,
+          message: "Lead was received but forwarding to automation webhooks failed.",
+          forwarded: forwardResults,
         });
-      } catch (emailErr) {
-        console.error("Failed to send lead emails:", emailErr);
-        emailResult = {
-          success: false,
-          emailError: emailErr instanceof Error ? emailErr.message : String(emailErr),
-        };
       }
 
       // If a Calendly link is configured, return it (so front-end can show a scheduling CTA)
       const calendlyLink = process.env.CALENDLY_LINK || null;
-      const firebaseEnabled = isFirebaseConfigured();
-      const hasWebhookTarget = forwardTargets.length > 0;
-      const emailEnabled = emailResult.success;
-      const hasConfiguredPipeline = firebaseEnabled || hasWebhookTarget || emailEnabled;
-
-      if (!hasConfiguredPipeline) {
-        return res.status(503).json({
-          ok: false,
-          message:
-            "Lead pipeline is not configured on server. Add FIREBASE_* and/or N8N_WEBHOOK_URL and EMAIL_* variables.",
-        });
-      }
 
       return res.status(200).json({
         ok: true,
         calendlyLink,
-        emailSent: emailEnabled,
+        forwarded: forwardResults,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

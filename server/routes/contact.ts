@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { z } from "zod";
-import { sendContactEmail } from "../services/email.js";
 
 const router = Router();
 
@@ -26,25 +25,22 @@ router.post("/", async (req, res) => {
   try {
     const lead = leadSchema.parse(req.body);
 
-    // 1) Email as backup (optional but smart)
-    await sendContactEmail({
-      name: lead.name,
-      email: lead.email,
-      subject: `New Lead: ${lead.goal} (${lead.budget})`,
-      message: `Company: ${lead.company}\nTools: ${lead.tools}\nTimeline: ${lead.timeline}\n\nDetails:\n${lead.details}`,
-    });
-
-    // 2) Forward to n8n (optional if env is set)
-    const n8nUrl = process.env.N8N_WEBHOOK_URL;
+    // Forward to n8n when configured.
+    const n8nUrl = process.env.N8N_WEBHOOK_URL || process.env.N8N_LEAD_WEBHOOK_URL;
     const secret = process.env.N8N_WEBHOOK_SECRET;
 
-    if (n8nUrl && secret) {
+    if (n8nUrl) {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (secret) {
+        headers["x-portfolio-secret"] = secret;
+      }
+
       await fetch(n8nUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-portfolio-secret": secret,
-        },
+        headers,
         body: JSON.stringify({
           source: "portfolio",
           type: "lead",
