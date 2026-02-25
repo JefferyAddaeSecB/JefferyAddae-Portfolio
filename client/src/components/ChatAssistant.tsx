@@ -164,6 +164,7 @@ export default function ChatAssistant() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const buildNewSessionId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
   // Generate session ID on mount
   useEffect(() => {
@@ -171,7 +172,7 @@ export default function ChatAssistant() {
     if (storedSessionId) {
       setSessionId(storedSessionId);
     } else {
-      const newSessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newSessionId = buildNewSessionId();
       setSessionId(newSessionId);
       localStorage.setItem('chat_session_id', newSessionId);
     }
@@ -207,63 +208,95 @@ export default function ChatAssistant() {
     }
   }, [input]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || !sessionId || isLoading) return;
+  const appendAssistantMessage = (data: any) => {
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: typeof data?.message === 'string' && data.message.trim()
+        ? data.message
+        : 'Sorry, I\'m having trouble connecting. Please try again or contact me directly at /contact.',
+      timestamp: data?.timestamp || new Date().toISOString(),
+      suggestedAction: data?.suggestedAction,
+      intent: data?.intent
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+  };
+
+  const appendConnectionError = () => {
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: 'Sorry, I\'m having trouble connecting. Please try again or contact me directly at /contact.',
+      timestamp: new Date().toISOString()
+    }]);
+  };
+
+  const requestAssistantReply = async (text: string) => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionId,
+        message: text,
+        context: {
+          page: typeof window !== 'undefined' ? window.location.pathname : '',
+          referrer: typeof document !== 'undefined' ? document.referrer : '',
+          timestamp: new Date().toISOString()
+        }
+      })
+    });
+
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`Invalid chat response (${response.status})`);
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.error || `Chat request failed (${response.status})`);
+    }
+
+    if (data?.success === false && !data?.message) {
+      throw new Error(data?.error || 'Chat request failed');
+    }
+
+    if (!data?.message && typeof data?.message !== 'string') {
+      throw new Error('Chat response missing message');
+    }
+
+    return data;
+  };
+
+  const submitUserMessage = async (text: string) => {
+    if (!text.trim() || !sessionId || isLoading) return;
 
     const userMessage: Message = {
       role: 'user',
-      content: input,
+      content: text,
       timestamp: new Date().toISOString()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          message: currentInput,
-          context: {
-            page: typeof window !== 'undefined' ? window.location.pathname : '',
-            referrer: typeof document !== 'undefined' ? document.referrer : '',
-            timestamp: new Date().toISOString()
-          }
-        })
-      });
-
-      const data = await response.json();
-
-      // Handle both success flag and message presence
-      if (data.success || data.message) {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: data.message || 'Message received',
-          timestamp: data.timestamp || new Date().toISOString(),
-          suggestedAction: data.suggestedAction,
-          intent: data.intent
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-      } else {
-        throw new Error(data.error || 'Failed to get response');
-      }
+      const data = await requestAssistantReply(text);
+      appendAssistantMessage(data);
     } catch (error) {
       console.error('❌ Chat error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Sorry, I\'m having trouble connecting. Please try again or contact me directly at /contact.',
-        timestamp: new Date().toISOString()
-      }]);
+      appendConnectionError();
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const currentInput = input;
+    await submitUserMessage(currentInput);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -284,65 +317,14 @@ export default function ChatAssistant() {
   const handleRefresh = () => {
     setMessages([]);
     setInput('');
-    const newSessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const newSessionId = buildNewSessionId();
     setSessionId(newSessionId);
     localStorage.setItem('chat_session_id', newSessionId);
     inputRef.current?.focus();
   };
 
   const handleQuickMessage = async (text: string) => {
-    const userMessage: Message = {
-      role: 'user',
-      content: text,
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          message: text,
-          context: {
-            page: typeof window !== 'undefined' ? window.location.pathname : '',
-            referrer: typeof document !== 'undefined' ? document.referrer : '',
-            timestamp: new Date().toISOString()
-          }
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success || data.message) {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: data.message || 'Message received',
-          timestamp: data.timestamp || new Date().toISOString(),
-          suggestedAction: data.suggestedAction,
-          intent: data.intent
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-      } else {
-        throw new Error(data.error || 'Failed to get response');
-      }
-    } catch (error) {
-      console.error('❌ Chat error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Sorry, I\'m having trouble connecting. Please try again or contact me directly at /contact.',
-        timestamp: new Date().toISOString()
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
+    await submitUserMessage(text);
   };
 
   return (

@@ -1,21 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-
-const WEBSITE_CHAT_SYSTEM_PROMPT = `
-You are Jeffery Addae's AI assistant on his personal website. Jeffery is an AI Automation & Voice AI specialist based in Toronto, Canada. He builds AI-powered phone call agents, voice automation systems, and workflow automation using tools like Vapi, Bland.ai, n8n, OpenAI, and Twilio.
-His PRIMARY specialization is AI Voice & Calls Automation — building inbound and outbound AI phone agents that qualify leads, book appointments, handle customer service calls, and run 24/7 without human staff.
-His secondary services include:
-- AI workflow automation (n8n, Zapier, Make)
-- Lead intake and qualification systems
-- CRM integrations and internal ops automation
-- Full-stack web applications
-When someone asks about phone agents, call automation, voice AI, or anything telephony-related, answer confidently and specifically. Mention tools like Vapi, Bland.ai, Twilio, or ElevenLabs where appropriate.
-When someone asks about pricing, DO NOT give a specific dollar range. Instead say: "Pricing depends on the scope — a single voice agent setup is different from a full multi-channel system. The best way to get an accurate picture is through Jeffery's free ROI Audit, where he'll map out exactly what you need and what it'll cost. Want to book one?"
-Always guide conversations toward one of two actions:
-1. Book a Free 45-minute Automation ROI Audit (primary CTA)
-2. Send a Message via the contact form (secondary CTA)
-Keep responses concise, confident, and conversational. Never be salesy. If there's no clear ROI fit, say so honestly — Jeffery values long-term relationships over quick sales.
-Jeffery's background: 2+ years building production automation systems, Humber College Computer Programming diploma, ALX AI Career Essentials certification, freelance since March 2024.
-`.trim();
+import {
+  WEBSITE_CHAT_ASSISTANT_PROFILE,
+  WEBSITE_CHAT_SYSTEM_PROMPT,
+  buildLocalAssistantFallback,
+  isGenericUpstreamFailureMessage,
+} from "../shared/chat-assistant";
 
 export default async function handler(
   req: VercelRequest,
@@ -48,34 +37,43 @@ export default async function handler(
 
     console.log("[API/CHAT] Forwarding to n8n:", { sessionId, messageLength: message.length });
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (process.env.N8N_CHAT_WEBHOOK_SECRET) {
+      headers["x-chat-webhook-secret"] = process.env.N8N_CHAT_WEBHOOK_SECRET;
+    }
+
+    const timeoutMs = Number(process.env.N8N_CHAT_TIMEOUT_MS || 15000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     // Forward to n8n
     const n8nResponse = await fetch(n8nWebhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
+      signal: controller.signal,
       body: JSON.stringify({
         sessionId,
         message,
         systemPrompt: WEBSITE_CHAT_SYSTEM_PROMPT,
+        assistantProfile: WEBSITE_CHAT_ASSISTANT_PROFILE,
         context: {
           ...normalizedContext,
           systemPrompt: WEBSITE_CHAT_SYSTEM_PROMPT,
-          assistantProfile: {
-            primarySpecialization: "AI Voice & Calls Automation",
-            primaryCta: "Book a Free 45-minute Automation ROI Audit",
-            secondaryCta: "Send a Message via the contact form",
-          },
+          assistantProfile: WEBSITE_CHAT_ASSISTANT_PROFILE,
         },
       }),
-    });
+    }).finally(() => clearTimeout(timeout));
 
     const responseText = await n8nResponse.text();
 
     if (!n8nResponse.ok) {
-      console.error("[API/CHAT] n8n error:", n8nResponse.status);
+      console.error("[API/CHAT] n8n error:", n8nResponse.status, responseText);
+      const fallback = buildLocalAssistantFallback(message);
       res.status(200).json({
-        success: false,
-        error: "n8n service error",
-        message: "Sorry, I'm having trouble connecting. Please try again.",
+        ...fallback,
+        error: "n8n_service_error",
       });
       return;
     }
@@ -87,15 +85,41 @@ export default async function handler(
       responseData = { success: true, message: responseText };
     }
 
+    const upstreamMessage =
+      typeof responseData?.message === "string"
+        ? responseData.message
+        : typeof responseText === "string"
+          ? responseText
+          : "";
+
+    if (isGenericUpstreamFailureMessage(upstreamMessage)) {
+      console.warn("[API/CHAT] Generic upstream failure reply detected; using local fallback");
+      const fallback = buildLocalAssistantFallback(message);
+      res.status(200).json({
+        ...fallback,
+        error: "n8n_generation_failed",
+      });
+      return;
+    }
+
     console.log("[API/CHAT] Success");
 
-    res.status(200).json({ success: true, ...responseData });
+    res.status(200).json({
+      success: responseData?.success !== false,
+      message: upstreamMessage || buildLocalAssistantFallback(message).message,
+      suggestedAction: responseData?.suggestedAction,
+      intent: responseData?.intent,
+      timestamp: responseData?.timestamp || new Date().toISOString(),
+      source: "n8n",
+    });
   } catch (error) {
     console.error("[API/CHAT] Error:", error);
+    const fallback = buildLocalAssistantFallback(
+      typeof req.body?.message === "string" ? req.body.message : ""
+    );
     res.status(200).json({
-      success: false,
+      ...fallback,
       error: error instanceof Error ? error.message : "Unknown error",
-      message: "Sorry, I'm having trouble connecting. Please try again.",
     });
   }
 }
