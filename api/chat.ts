@@ -31,7 +31,7 @@ const GENERIC_UPSTREAM_FAILURE_PATTERNS = [
   /please try again or use the contact form/i,
 ];
 
-function isGenericUpstreamFailureMessage(message) {
+function isGenericUpstreamFailureMessage(message: unknown) {
   if (typeof message !== "string") return false;
   const text = message.trim();
   if (!text) return true;
@@ -39,9 +39,9 @@ function isGenericUpstreamFailureMessage(message) {
 }
 
 function buildReply(
-  message,
-  intent,
-  suggestedAction
+  message: string,
+  intent: string,
+  suggestedAction: string
 ) {
   return {
     success: true,
@@ -53,7 +53,7 @@ function buildReply(
   };
 }
 
-function buildLocalAssistantFallback(userInput) {
+function buildLocalAssistantFallback(userInput: string) {
   const text = (userInput || "").toLowerCase();
 
   if (/\b(price|pricing|cost|quote|budget|how much)\b/.test(text)) {
@@ -153,7 +153,7 @@ export default async function handler(
 
     console.log("[API/CHAT] Forwarding to n8n:", { sessionId, messageLength: message.length });
 
-    const headers = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     if (process.env.N8N_CHAT_WEBHOOK_SECRET) {
@@ -194,7 +194,7 @@ export default async function handler(
       return;
     }
 
-    let responseData = null;
+    let responseData: any = null;
     try {
       responseData = responseText ? JSON.parse(responseText) : null;
     } catch (e) {
