@@ -284,6 +284,9 @@ export default function ChatAssistant() {
   const handleRefresh = () => {
     setMessages([]);
     setInput('');
+    const newSessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    setSessionId(newSessionId);
+    localStorage.setItem('chat_session_id', newSessionId);
     inputRef.current?.focus();
   };
 
