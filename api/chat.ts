@@ -21,16 +21,6 @@ const WEBSITE_CHAT_ASSISTANT_PROFILE = {
   primarySpecialization: "AI Voice & Calls Automation",
   primaryCta: "Book a Free 45-minute Automation ROI Audit",
   secondaryCta: "Send a Message via the contact form",
-} as const;
-
-type WebsiteChatReply = {
-  success: boolean;
-  message: string;
-  timestamp: string;
-  suggestedAction?: string;
-  intent?: string;
-  source?: "n8n" | "local_fallback";
-  error?: string;
 };
 
 const GENERIC_UPSTREAM_FAILURE_PATTERNS = [
@@ -41,7 +31,7 @@ const GENERIC_UPSTREAM_FAILURE_PATTERNS = [
   /please try again or use the contact form/i,
 ];
 
-function isGenericUpstreamFailureMessage(message: unknown): boolean {
+function isGenericUpstreamFailureMessage(message) {
   if (typeof message !== "string") return false;
   const text = message.trim();
   if (!text) return true;
@@ -49,10 +39,10 @@ function isGenericUpstreamFailureMessage(message: unknown): boolean {
 }
 
 function buildReply(
-  message: string,
-  intent: string,
-  suggestedAction: string
-): WebsiteChatReply {
+  message,
+  intent,
+  suggestedAction
+) {
   return {
     success: true,
     message,
@@ -63,7 +53,7 @@ function buildReply(
   };
 }
 
-function buildLocalAssistantFallback(userInput: string): WebsiteChatReply {
+function buildLocalAssistantFallback(userInput) {
   const text = (userInput || "").toLowerCase();
 
   if (/\b(price|pricing|cost|quote|budget|how much)\b/.test(text)) {
@@ -163,7 +153,7 @@ export default async function handler(
 
     console.log("[API/CHAT] Forwarding to n8n:", { sessionId, messageLength: message.length });
 
-    const headers: Record<string, string> = {
+    const headers = {
       "Content-Type": "application/json",
     };
     if (process.env.N8N_CHAT_WEBHOOK_SECRET) {
@@ -204,7 +194,7 @@ export default async function handler(
       return;
     }
 
-    let responseData: any = null;
+    let responseData = null;
     try {
       responseData = responseText ? JSON.parse(responseText) : null;
     } catch (e) {
